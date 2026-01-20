@@ -169,6 +169,7 @@ export default function Subjects() {
                           placeholder="Brief description of the subject..."
                           className="resize-none"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-subject-description"
                         />
                       </FormControl>

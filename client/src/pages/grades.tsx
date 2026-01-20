@@ -257,7 +257,7 @@ export default function Grades() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Term/Type (optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                         <FormControl>
                           <SelectTrigger data-testid="select-grade-term">
                             <SelectValue placeholder="Select term or type" />

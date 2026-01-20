@@ -78,7 +78,12 @@ export class MemStorage implements IStorage {
 
   async createStudent(insertStudent: InsertStudent): Promise<Student> {
     const id = randomUUID();
-    const student: Student = { ...insertStudent, id };
+    const student: Student = {
+      id,
+      fullName: insertStudent.fullName,
+      gradeLevel: insertStudent.gradeLevel,
+      email: insertStudent.email ?? null,
+    };
     this.students.set(id, student);
     return student;
   }
@@ -86,7 +91,12 @@ export class MemStorage implements IStorage {
   async updateStudent(id: string, insertStudent: InsertStudent): Promise<Student | undefined> {
     const existing = this.students.get(id);
     if (!existing) return undefined;
-    const updated: Student = { ...insertStudent, id };
+    const updated: Student = {
+      id,
+      fullName: insertStudent.fullName,
+      gradeLevel: insertStudent.gradeLevel,
+      email: insertStudent.email ?? null,
+    };
     this.students.set(id, updated);
     return updated;
   }
@@ -105,7 +115,11 @@ export class MemStorage implements IStorage {
 
   async createSubject(insertSubject: InsertSubject): Promise<Subject> {
     const id = randomUUID();
-    const subject: Subject = { ...insertSubject, id };
+    const subject: Subject = {
+      id,
+      name: insertSubject.name,
+      description: insertSubject.description ?? null,
+    };
     this.subjects.set(id, subject);
     return subject;
   }
@@ -113,7 +127,11 @@ export class MemStorage implements IStorage {
   async updateSubject(id: string, insertSubject: InsertSubject): Promise<Subject | undefined> {
     const existing = this.subjects.get(id);
     if (!existing) return undefined;
-    const updated: Subject = { ...insertSubject, id };
+    const updated: Subject = {
+      id,
+      name: insertSubject.name,
+      description: insertSubject.description ?? null,
+    };
     this.subjects.set(id, updated);
     return updated;
   }
@@ -140,7 +158,15 @@ export class MemStorage implements IStorage {
 
   async createGrade(insertGrade: InsertGrade): Promise<Grade> {
     const id = randomUUID();
-    const grade: Grade = { ...insertGrade, id };
+    const grade: Grade = {
+      id,
+      studentId: insertGrade.studentId,
+      subjectId: insertGrade.subjectId,
+      score: insertGrade.score,
+      maxScore: insertGrade.maxScore ?? 100,
+      term: insertGrade.term ?? null,
+      date: insertGrade.date ?? null,
+    };
     this.grades.set(id, grade);
     return grade;
   }
@@ -148,7 +174,15 @@ export class MemStorage implements IStorage {
   async updateGrade(id: string, insertGrade: InsertGrade): Promise<Grade | undefined> {
     const existing = this.grades.get(id);
     if (!existing) return undefined;
-    const updated: Grade = { ...insertGrade, id };
+    const updated: Grade = {
+      id,
+      studentId: insertGrade.studentId,
+      subjectId: insertGrade.subjectId,
+      score: insertGrade.score,
+      maxScore: insertGrade.maxScore ?? 100,
+      term: insertGrade.term ?? null,
+      date: insertGrade.date ?? null,
+    };
     this.grades.set(id, updated);
     return updated;
   }

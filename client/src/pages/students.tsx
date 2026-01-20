@@ -188,7 +188,7 @@ export default function Students() {
                     <FormItem>
                       <FormLabel>Email (optional)</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="student@school.edu" {...field} data-testid="input-student-email" />
+                        <Input type="email" placeholder="student@school.edu" {...field} value={field.value ?? ""} data-testid="input-student-email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
