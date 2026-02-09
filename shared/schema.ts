@@ -63,3 +63,31 @@ export const insertGradeSchema = createInsertSchema(grades).omit({
 
 export type InsertGrade = z.infer<typeof insertGradeSchema>;
 export type Grade = typeof grades.$inferSelect;
+
+// Teachers table
+export const teachers = pgTable("teachers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fullName: text("full_name").notNull(),
+  email: text("email"),
+});
+
+export const insertTeacherSchema = createInsertSchema(teachers).omit({
+  id: true,
+});
+
+export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
+export type Teacher = typeof teachers.$inferSelect;
+
+// Teacher-Subject assignments (many-to-many)
+export const teacherSubjects = pgTable("teacher_subjects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teacherId: varchar("teacher_id").notNull(),
+  subjectId: varchar("subject_id").notNull(),
+});
+
+export const insertTeacherSubjectSchema = createInsertSchema(teacherSubjects).omit({
+  id: true,
+});
+
+export type InsertTeacherSubject = z.infer<typeof insertTeacherSubjectSchema>;
+export type TeacherSubject = typeof teacherSubjects.$inferSelect;

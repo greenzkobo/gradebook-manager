@@ -7,6 +7,10 @@ import {
   type InsertSubject,
   type Grade,
   type InsertGrade,
+  type Teacher,
+  type InsertTeacher,
+  type TeacherSubject,
+  type InsertTeacherSubject,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -36,6 +40,19 @@ export interface IStorage {
   deleteGrade(id: string): Promise<boolean>;
   deleteGradesByStudent(studentId: string): Promise<void>;
   deleteGradesBySubject(subjectId: string): Promise<void>;
+
+  getTeachers(): Promise<Teacher[]>;
+  getTeacher(id: string): Promise<Teacher | undefined>;
+  createTeacher(teacher: InsertTeacher): Promise<Teacher>;
+  updateTeacher(id: string, teacher: InsertTeacher): Promise<Teacher | undefined>;
+  deleteTeacher(id: string): Promise<boolean>;
+
+  getTeacherSubjects(teacherId: string): Promise<TeacherSubject[]>;
+  getAllTeacherSubjects(): Promise<TeacherSubject[]>;
+  assignSubjectToTeacher(assignment: InsertTeacherSubject): Promise<TeacherSubject>;
+  removeTeacherSubject(id: string): Promise<boolean>;
+  removeTeacherSubjectsByTeacher(teacherId: string): Promise<void>;
+  removeTeacherSubjectsBySubject(subjectId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -43,12 +60,16 @@ export class MemStorage implements IStorage {
   private students: Map<string, Student>;
   private subjects: Map<string, Subject>;
   private grades: Map<string, Grade>;
+  private teachers: Map<string, Teacher>;
+  private teacherSubjects: Map<string, TeacherSubject>;
 
   constructor() {
     this.users = new Map();
     this.students = new Map();
     this.subjects = new Map();
     this.grades = new Map();
+    this.teachers = new Map();
+    this.teacherSubjects = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -203,6 +224,80 @@ export class MemStorage implements IStorage {
       .filter(([, g]) => g.subjectId === subjectId)
       .map(([id]) => id);
     toDelete.forEach((id) => this.grades.delete(id));
+  }
+
+  async getTeachers(): Promise<Teacher[]> {
+    return Array.from(this.teachers.values());
+  }
+
+  async getTeacher(id: string): Promise<Teacher | undefined> {
+    return this.teachers.get(id);
+  }
+
+  async createTeacher(insertTeacher: InsertTeacher): Promise<Teacher> {
+    const id = randomUUID();
+    const teacher: Teacher = {
+      id,
+      fullName: insertTeacher.fullName,
+      email: insertTeacher.email ?? null,
+    };
+    this.teachers.set(id, teacher);
+    return teacher;
+  }
+
+  async updateTeacher(id: string, insertTeacher: InsertTeacher): Promise<Teacher | undefined> {
+    const existing = this.teachers.get(id);
+    if (!existing) return undefined;
+    const updated: Teacher = {
+      id,
+      fullName: insertTeacher.fullName,
+      email: insertTeacher.email ?? null,
+    };
+    this.teachers.set(id, updated);
+    return updated;
+  }
+
+  async deleteTeacher(id: string): Promise<boolean> {
+    return this.teachers.delete(id);
+  }
+
+  async getTeacherSubjects(teacherId: string): Promise<TeacherSubject[]> {
+    return Array.from(this.teacherSubjects.values()).filter(
+      (ts) => ts.teacherId === teacherId
+    );
+  }
+
+  async getAllTeacherSubjects(): Promise<TeacherSubject[]> {
+    return Array.from(this.teacherSubjects.values());
+  }
+
+  async assignSubjectToTeacher(insert: InsertTeacherSubject): Promise<TeacherSubject> {
+    const id = randomUUID();
+    const assignment: TeacherSubject = {
+      id,
+      teacherId: insert.teacherId,
+      subjectId: insert.subjectId,
+    };
+    this.teacherSubjects.set(id, assignment);
+    return assignment;
+  }
+
+  async removeTeacherSubject(id: string): Promise<boolean> {
+    return this.teacherSubjects.delete(id);
+  }
+
+  async removeTeacherSubjectsByTeacher(teacherId: string): Promise<void> {
+    const toDelete = Array.from(this.teacherSubjects.entries())
+      .filter(([, ts]) => ts.teacherId === teacherId)
+      .map(([id]) => id);
+    toDelete.forEach((id) => this.teacherSubjects.delete(id));
+  }
+
+  async removeTeacherSubjectsBySubject(subjectId: string): Promise<void> {
+    const toDelete = Array.from(this.teacherSubjects.entries())
+      .filter(([, ts]) => ts.subjectId === subjectId)
+      .map(([id]) => id);
+    toDelete.forEach((id) => this.teacherSubjects.delete(id));
   }
 }
 

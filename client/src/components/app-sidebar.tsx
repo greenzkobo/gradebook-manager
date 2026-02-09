@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, BookOpen, ClipboardList, GraduationCap } from "lucide-react";
+import { LayoutDashboard, Users, BookOpen, ClipboardList, GraduationCap, UserCheck } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +18,7 @@ const menuItems = [
   { title: "Students", url: "/students", icon: Users },
   { title: "Subjects", url: "/subjects", icon: BookOpen },
   { title: "Grades", url: "/grades", icon: ClipboardList },
+  { title: "Teachers", url: "/teachers", icon: UserCheck },
 ];
 
 export function AppSidebar() {

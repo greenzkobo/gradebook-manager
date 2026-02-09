@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import Students from "@/pages/students";
 import Subjects from "@/pages/subjects";
 import Grades from "@/pages/grades";
+import Teachers from "@/pages/teachers";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/students" component={Students} />
       <Route path="/subjects" component={Subjects} />
       <Route path="/grades" component={Grades} />
+      <Route path="/teachers" component={Teachers} />
       <Route component={NotFound} />
     </Switch>
   );

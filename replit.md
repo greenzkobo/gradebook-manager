@@ -4,6 +4,7 @@
 A web-based school grades management system that allows teachers and administrators to track student performance, manage subjects, and record grades efficiently.
 
 ## Recent Changes
+- February 2026: Added Teachers management with subject assignment (many-to-many)
 - January 2026: Initial MVP implementation with students, subjects, and grades management
 
 ## Project Architecture
@@ -24,12 +25,15 @@ A web-based school grades management system that allows teachers and administrat
 - **Students**: id, fullName, gradeLevel, email (optional)
 - **Subjects**: id, name, description (optional)
 - **Grades**: id, studentId, subjectId, score, maxScore, term, date
+- **Teachers**: id, fullName, email (optional)
+- **TeacherSubjects**: id, teacherId, subjectId (many-to-many assignments)
 
 ### Key Pages
 1. **Dashboard** (`/`): Overview with statistics and recent grades
 2. **Students** (`/students`): CRUD operations for student records
 3. **Subjects** (`/subjects`): CRUD operations for course subjects
 4. **Grades** (`/grades`): Record and manage student grades with filters
+5. **Teachers** (`/teachers`): Manage teachers and assign subjects to them
 
 ### API Endpoints
 - `GET/POST /api/students` - List/Create students
@@ -38,6 +42,11 @@ A web-based school grades management system that allows teachers and administrat
 - `GET/PUT/DELETE /api/subjects/:id` - Subject CRUD
 - `GET/POST /api/grades` - List/Create grades
 - `GET/PUT/DELETE /api/grades/:id` - Grade CRUD
+- `GET/POST /api/teachers` - List/Create teachers
+- `GET/PUT/DELETE /api/teachers/:id` - Teacher CRUD
+- `GET/POST /api/teacher-subjects` - List/Create teacher-subject assignments
+- `GET /api/teacher-subjects/:teacherId` - Get assignments for a teacher
+- `DELETE /api/teacher-subjects/:id` - Remove assignment
 
 ## Development Commands
 - `npm run dev` - Start development server (frontend + backend)
