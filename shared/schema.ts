@@ -53,8 +53,11 @@ export const grades = pgTable("grades", {
   subjectId: varchar("subject_id").notNull(),
   score: integer("score").notNull(),
   maxScore: integer("max_score").notNull().default(100),
+  category: text("category"),
   term: text("term"),
   date: text("date"),
+  fileName: text("file_name"),
+  fileUrl: text("file_url"),
 });
 
 export const insertGradeSchema = createInsertSchema(grades).omit({
@@ -63,6 +66,34 @@ export const insertGradeSchema = createInsertSchema(grades).omit({
 
 export type InsertGrade = z.infer<typeof insertGradeSchema>;
 export type Grade = typeof grades.$inferSelect;
+
+export const GRADE_CATEGORIES = [
+  "Homework",
+  "Quiz",
+  "Test",
+  "Exam",
+  "Project",
+  "Assignment",
+  "Classwork",
+  "Participation",
+] as const;
+
+export type GradeCategory = (typeof GRADE_CATEGORIES)[number];
+
+// Category weights per subject
+export const categoryWeights = pgTable("category_weights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subjectId: varchar("subject_id").notNull(),
+  category: text("category").notNull(),
+  weight: integer("weight").notNull(),
+});
+
+export const insertCategoryWeightSchema = createInsertSchema(categoryWeights).omit({
+  id: true,
+});
+
+export type InsertCategoryWeight = z.infer<typeof insertCategoryWeightSchema>;
+export type CategoryWeight = typeof categoryWeights.$inferSelect;
 
 // Teachers table
 export const teachers = pgTable("teachers", {

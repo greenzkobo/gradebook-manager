@@ -4,6 +4,7 @@
 A web-based school grades management system that allows teachers and administrators to track student performance, manage subjects, and record grades efficiently.
 
 ## Recent Changes
+- February 2026: Added file uploads and assignment weighting to Gradebook
 - February 2026: Renamed Grades tab to Gradebook with prominent subject filtering tabs
 - February 2026: Added Teachers management with subject assignment (many-to-many)
 - January 2026: Initial MVP implementation with students, subjects, and grades management
@@ -25,7 +26,8 @@ A web-based school grades management system that allows teachers and administrat
 ### Data Models
 - **Students**: id, fullName, gradeLevel, email (optional)
 - **Subjects**: id, name, description (optional)
-- **Grades**: id, studentId, subjectId, score, maxScore, term, date
+- **Grades**: id, studentId, subjectId, score, maxScore, category, term, date, fileName, fileUrl
+- **CategoryWeights**: id, subjectId, category, weight (percentage)
 - **Teachers**: id, fullName, email (optional)
 - **TeacherSubjects**: id, teacherId, subjectId (many-to-many assignments)
 
@@ -33,7 +35,7 @@ A web-based school grades management system that allows teachers and administrat
 1. **Dashboard** (`/`): Overview with statistics and recent grades
 2. **Students** (`/students`): CRUD operations for student records
 3. **Subjects** (`/subjects`): CRUD operations for course subjects
-4. **Gradebook** (`/grades`): Record and manage student grades with subject filtering tabs
+4. **Gradebook** (`/grades`): Record and manage student grades with subject filtering tabs, file uploads, assignment categories, and weighted grade calculations
 5. **Teachers** (`/teachers`): Manage teachers and assign subjects to them
 
 ### API Endpoints
@@ -41,8 +43,11 @@ A web-based school grades management system that allows teachers and administrat
 - `GET/PUT/DELETE /api/students/:id` - Student CRUD
 - `GET/POST /api/subjects` - List/Create subjects
 - `GET/PUT/DELETE /api/subjects/:id` - Subject CRUD
-- `GET/POST /api/grades` - List/Create grades
-- `GET/PUT/DELETE /api/grades/:id` - Grade CRUD
+- `GET/POST /api/grades` - List/Create grades (POST supports multipart/form-data for file uploads)
+- `GET/PUT/DELETE /api/grades/:id` - Grade CRUD (PUT supports file uploads)
+- `GET/POST /api/category-weights` - List/Set category weights per subject
+- `GET /api/category-weights/:subjectId` - Get weights for a subject
+- `DELETE /api/category-weights/:id` - Remove a category weight
 - `GET/POST /api/teachers` - List/Create teachers
 - `GET/PUT/DELETE /api/teachers/:id` - Teacher CRUD
 - `GET/POST /api/teacher-subjects` - List/Create teacher-subject assignments

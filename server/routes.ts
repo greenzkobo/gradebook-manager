@@ -1,13 +1,71 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertStudentSchema, insertSubjectSchema, insertGradeSchema, insertTeacherSchema, insertTeacherSubjectSchema } from "@shared/schema";
+import { insertStudentSchema, insertSubjectSchema, insertGradeSchema, insertTeacherSchema, insertTeacherSubjectSchema, insertCategoryWeightSchema } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const fileStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
+  },
+});
+
+const allowedMimeTypes = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+];
+
+const upload = multer({
+  storage: fileStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("File type not allowed. Please upload a document or image file."));
+    }
+  },
+});
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.use("/uploads", (req, res, _next) => {
+    const fileName = path.basename(req.path);
+    const filePath = path.join(uploadsDir, fileName);
+    if (fs.existsSync(filePath)) {
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ error: "File not found" });
+    }
+  });
+
   // Students API
   app.get("/api/students", async (_req, res) => {
     const students = await storage.getStudents();
@@ -106,6 +164,7 @@ export async function registerRoutes(
   app.delete("/api/subjects/:id", async (req, res) => {
     await storage.deleteGradesBySubject(req.params.id);
     await storage.removeTeacherSubjectsBySubject(req.params.id);
+    await storage.deleteCategoryWeightsBySubject(req.params.id);
     const deleted = await storage.deleteSubject(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Subject not found" });
@@ -127,9 +186,17 @@ export async function registerRoutes(
     res.json(grade);
   });
 
-  app.post("/api/grades", async (req, res) => {
+  app.post("/api/grades", upload.single("file"), async (req, res) => {
     try {
-      const data = insertGradeSchema.parse(req.body);
+      const body = { ...req.body };
+      if (body.score !== undefined) body.score = Number(body.score);
+      if (body.maxScore !== undefined) body.maxScore = Number(body.maxScore);
+      if (body.category === "") body.category = null;
+      if (body.term === "") body.term = null;
+      if (body.fileName === "") body.fileName = null;
+      if (body.fileUrl === "") body.fileUrl = null;
+
+      const data = insertGradeSchema.parse(body);
       const student = await storage.getStudent(data.studentId);
       if (!student) {
         return res.status(400).json({ error: "Student not found" });
@@ -138,6 +205,12 @@ export async function registerRoutes(
       if (!subject) {
         return res.status(400).json({ error: "Subject not found" });
       }
+
+      if (req.file) {
+        data.fileName = req.file.originalname;
+        data.fileUrl = `/uploads/${req.file.filename}`;
+      }
+
       const grade = await storage.createGrade(data);
       res.status(201).json(grade);
     } catch (error) {
@@ -148,9 +221,17 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/grades/:id", async (req, res) => {
+  app.put("/api/grades/:id", upload.single("file"), async (req, res) => {
     try {
-      const data = insertGradeSchema.parse(req.body);
+      const body = { ...req.body };
+      if (body.score !== undefined) body.score = Number(body.score);
+      if (body.maxScore !== undefined) body.maxScore = Number(body.maxScore);
+      if (body.category === "") body.category = null;
+      if (body.term === "") body.term = null;
+      if (body.fileName === "") body.fileName = null;
+      if (body.fileUrl === "") body.fileUrl = null;
+
+      const data = insertGradeSchema.parse(body);
       const student = await storage.getStudent(data.studentId);
       if (!student) {
         return res.status(400).json({ error: "Student not found" });
@@ -159,6 +240,12 @@ export async function registerRoutes(
       if (!subject) {
         return res.status(400).json({ error: "Subject not found" });
       }
+
+      if (req.file) {
+        data.fileName = req.file.originalname;
+        data.fileUrl = `/uploads/${req.file.filename}`;
+      }
+
       const grade = await storage.updateGrade(req.params.id, data);
       if (!grade) {
         return res.status(404).json({ error: "Grade not found" });
@@ -173,9 +260,62 @@ export async function registerRoutes(
   });
 
   app.delete("/api/grades/:id", async (req, res) => {
+    const grade = await storage.getGrade(req.params.id);
+    if (grade?.fileUrl) {
+      const filePath = path.join(process.cwd(), grade.fileUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
     const deleted = await storage.deleteGrade(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Grade not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Category Weights API
+  app.get("/api/category-weights", async (_req, res) => {
+    const weights = await storage.getAllCategoryWeights();
+    res.json(weights);
+  });
+
+  app.get("/api/category-weights/:subjectId", async (req, res) => {
+    const weights = await storage.getCategoryWeights(req.params.subjectId);
+    res.json(weights);
+  });
+
+  app.post("/api/category-weights", async (req, res) => {
+    try {
+      const data = insertCategoryWeightSchema.parse(req.body);
+      if (data.weight < 1 || data.weight > 100) {
+        return res.status(400).json({ error: "Weight must be between 1 and 100" });
+      }
+      const subject = await storage.getSubject(data.subjectId);
+      if (!subject) {
+        return res.status(400).json({ error: "Subject not found" });
+      }
+      const existingWeights = await storage.getCategoryWeights(data.subjectId);
+      const currentTotal = existingWeights
+        .filter((w) => w.category !== data.category)
+        .reduce((sum, w) => sum + w.weight, 0);
+      if (currentTotal + data.weight > 100) {
+        return res.status(400).json({ error: `Total weight would exceed 100%. Available: ${100 - currentTotal}%` });
+      }
+      const weight = await storage.setCategoryWeight(data);
+      res.status(201).json(weight);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to set category weight" });
+    }
+  });
+
+  app.delete("/api/category-weights/:id", async (req, res) => {
+    const deleted = await storage.deleteCategoryWeight(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Category weight not found" });
     }
     res.status(204).send();
   });

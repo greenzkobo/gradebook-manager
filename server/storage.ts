@@ -11,6 +11,8 @@ import {
   type InsertTeacher,
   type TeacherSubject,
   type InsertTeacherSubject,
+  type CategoryWeight,
+  type InsertCategoryWeight,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -41,6 +43,13 @@ export interface IStorage {
   deleteGradesByStudent(studentId: string): Promise<void>;
   deleteGradesBySubject(subjectId: string): Promise<void>;
 
+  getCategoryWeights(subjectId: string): Promise<CategoryWeight[]>;
+  getAllCategoryWeights(): Promise<CategoryWeight[]>;
+  setCategoryWeight(data: InsertCategoryWeight): Promise<CategoryWeight>;
+  updateCategoryWeight(id: string, data: InsertCategoryWeight): Promise<CategoryWeight | undefined>;
+  deleteCategoryWeight(id: string): Promise<boolean>;
+  deleteCategoryWeightsBySubject(subjectId: string): Promise<void>;
+
   getTeachers(): Promise<Teacher[]>;
   getTeacher(id: string): Promise<Teacher | undefined>;
   createTeacher(teacher: InsertTeacher): Promise<Teacher>;
@@ -62,6 +71,7 @@ export class MemStorage implements IStorage {
   private grades: Map<string, Grade>;
   private teachers: Map<string, Teacher>;
   private teacherSubjects: Map<string, TeacherSubject>;
+  private categoryWeightsMap: Map<string, CategoryWeight>;
 
   constructor() {
     this.users = new Map();
@@ -70,6 +80,7 @@ export class MemStorage implements IStorage {
     this.grades = new Map();
     this.teachers = new Map();
     this.teacherSubjects = new Map();
+    this.categoryWeightsMap = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -185,8 +196,11 @@ export class MemStorage implements IStorage {
       subjectId: insertGrade.subjectId,
       score: insertGrade.score,
       maxScore: insertGrade.maxScore ?? 100,
+      category: insertGrade.category ?? null,
       term: insertGrade.term ?? null,
       date: insertGrade.date ?? null,
+      fileName: insertGrade.fileName ?? null,
+      fileUrl: insertGrade.fileUrl ?? null,
     };
     this.grades.set(id, grade);
     return grade;
@@ -201,8 +215,11 @@ export class MemStorage implements IStorage {
       subjectId: insertGrade.subjectId,
       score: insertGrade.score,
       maxScore: insertGrade.maxScore ?? 100,
+      category: insertGrade.category ?? null,
       term: insertGrade.term ?? null,
       date: insertGrade.date ?? null,
+      fileName: insertGrade.fileName ?? existing.fileName,
+      fileUrl: insertGrade.fileUrl ?? existing.fileUrl,
     };
     this.grades.set(id, updated);
     return updated;
@@ -224,6 +241,60 @@ export class MemStorage implements IStorage {
       .filter(([, g]) => g.subjectId === subjectId)
       .map(([id]) => id);
     toDelete.forEach((id) => this.grades.delete(id));
+  }
+
+  async getCategoryWeights(subjectId: string): Promise<CategoryWeight[]> {
+    return Array.from(this.categoryWeightsMap.values()).filter(
+      (cw) => cw.subjectId === subjectId
+    );
+  }
+
+  async getAllCategoryWeights(): Promise<CategoryWeight[]> {
+    return Array.from(this.categoryWeightsMap.values());
+  }
+
+  async setCategoryWeight(data: InsertCategoryWeight): Promise<CategoryWeight> {
+    const existing = Array.from(this.categoryWeightsMap.values()).find(
+      (cw) => cw.subjectId === data.subjectId && cw.category === data.category
+    );
+    if (existing) {
+      const updated: CategoryWeight = { ...existing, weight: data.weight };
+      this.categoryWeightsMap.set(existing.id, updated);
+      return updated;
+    }
+    const id = randomUUID();
+    const cw: CategoryWeight = {
+      id,
+      subjectId: data.subjectId,
+      category: data.category,
+      weight: data.weight,
+    };
+    this.categoryWeightsMap.set(id, cw);
+    return cw;
+  }
+
+  async updateCategoryWeight(id: string, data: InsertCategoryWeight): Promise<CategoryWeight | undefined> {
+    const existing = this.categoryWeightsMap.get(id);
+    if (!existing) return undefined;
+    const updated: CategoryWeight = {
+      id,
+      subjectId: data.subjectId,
+      category: data.category,
+      weight: data.weight,
+    };
+    this.categoryWeightsMap.set(id, updated);
+    return updated;
+  }
+
+  async deleteCategoryWeight(id: string): Promise<boolean> {
+    return this.categoryWeightsMap.delete(id);
+  }
+
+  async deleteCategoryWeightsBySubject(subjectId: string): Promise<void> {
+    const toDelete = Array.from(this.categoryWeightsMap.entries())
+      .filter(([, cw]) => cw.subjectId === subjectId)
+      .map(([id]) => id);
+    toDelete.forEach((id) => this.categoryWeightsMap.delete(id));
   }
 
   async getTeachers(): Promise<Teacher[]> {
