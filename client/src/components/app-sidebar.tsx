@@ -17,7 +17,7 @@ const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Students", url: "/students", icon: Users },
   { title: "Subjects", url: "/subjects", icon: BookOpen },
-  { title: "Grades", url: "/grades", icon: ClipboardList },
+  { title: "Gradebook", url: "/grades", icon: ClipboardList },
   { title: "Teachers", url: "/teachers", icon: UserCheck },
 ];
 

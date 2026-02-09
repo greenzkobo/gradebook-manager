@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, ClipboardList, Search, Filter } from "lucide-react";
+import { Plus, Pencil, Trash2, ClipboardList, Search, BookOpen } from "lucide-react";
 import { insertGradeSchema, type Grade, type InsertGrade, type Student, type Subject } from "@shared/schema";
 
 const gradeFormSchema = insertGradeSchema.extend({
@@ -137,8 +137,8 @@ export default function Grades() {
     const studentName = getStudentName(g.studentId).toLowerCase();
     const subjectName = getSubjectName(g.subjectId).toLowerCase();
     const matchesSearch = studentName.includes(searchQuery.toLowerCase()) || subjectName.includes(searchQuery.toLowerCase());
-    const matchesStudent = !filterStudent || g.studentId === filterStudent;
-    const matchesSubject = !filterSubject || g.subjectId === filterSubject;
+    const matchesStudent = !filterStudent || filterStudent === "all" || g.studentId === filterStudent;
+    const matchesSubject = !filterSubject || filterSubject === "all" || g.subjectId === filterSubject;
     return matchesSearch && matchesStudent && matchesSubject;
   });
 
@@ -156,8 +156,8 @@ export default function Grades() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-grades-title">Grades</h1>
-          <p className="text-muted-foreground">Record and manage student grades</p>
+          <h1 className="text-2xl font-bold" data-testid="text-grades-title">Gradebook</h1>
+          <p className="text-muted-foreground">Record and manage student grades by subject</p>
         </div>
         <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
           <DialogTrigger asChild>
@@ -303,50 +303,76 @@ export default function Grades() {
         </Card>
       )}
 
+      {subjects.length > 0 && (
+        <div className="flex flex-wrap gap-2" data-testid="subject-filter-tabs">
+          <Button
+            variant={filterSubject === "" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilterSubject("")}
+            data-testid="filter-subject-all"
+          >
+            <BookOpen className="h-4 w-4 mr-2" />
+            All Subjects
+          </Button>
+          {subjects.map((subject) => (
+            <Button
+              key={subject.id}
+              variant={filterSubject === subject.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterSubject(filterSubject === subject.id ? "" : subject.id)}
+              data-testid={`filter-subject-${subject.id}`}
+            >
+              {subject.name}
+              {filterSubject === subject.id && (
+                <Badge variant="secondary" className="ml-2">
+                  {grades.filter((g) => g.subjectId === subject.id).length}
+                </Badge>
+              )}
+            </Button>
+          ))}
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-4">
-            <div>
-              <CardTitle>Grade Records</CardTitle>
-              <CardDescription>{grades.length} grades recorded</CardDescription>
+            <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+              <div>
+                <CardTitle>
+                  {filterSubject && subjects.find(s => s.id === filterSubject)
+                    ? subjects.find(s => s.id === filterSubject)!.name + " Grades"
+                    : "All Grades"}
+                </CardTitle>
+                <CardDescription>
+                  {filteredGrades.length} {filteredGrades.length === 1 ? "grade" : "grades"} recorded
+                  {filterSubject && subjects.find(s => s.id === filterSubject)
+                    ? ` in ${subjects.find(s => s.id === filterSubject)!.name}`
+                    : ""}
+                </CardDescription>
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by student or subject..."
+                  placeholder="Search by student..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
                   data-testid="input-search-grades"
                 />
               </div>
-              <div className="flex gap-2">
-                <Select value={filterStudent} onValueChange={setFilterStudent}>
-                  <SelectTrigger className="w-40" data-testid="select-filter-student">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="All Students" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Students</SelectItem>
-                    {students.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.fullName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filterSubject} onValueChange={setFilterSubject}>
-                  <SelectTrigger className="w-40" data-testid="select-filter-subject">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="All Subjects" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Subjects</SelectItem>
-                    {subjects.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={filterStudent} onValueChange={setFilterStudent}>
+                <SelectTrigger className="w-40" data-testid="select-filter-student">
+                  <SelectValue placeholder="All Students" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Students</SelectItem>
+                  {students.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.fullName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -361,10 +387,12 @@ export default function Grades() {
             <div className="text-center py-12 text-muted-foreground" data-testid="text-no-grades">
               <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p className="font-medium">
-                {searchQuery || filterStudent || filterSubject ? "No matching grades found" : "No grades yet"}
+                {searchQuery || (filterStudent && filterStudent !== "all") || (filterSubject && filterSubject !== "all")
+                  ? "No matching grades found"
+                  : "No grades yet"}
               </p>
               <p className="text-sm">
-                {searchQuery || filterStudent || filterSubject
+                {searchQuery || (filterStudent && filterStudent !== "all") || (filterSubject && filterSubject !== "all")
                   ? "Try adjusting your filters"
                   : canAddGrades
                   ? "Record your first grade to get started"

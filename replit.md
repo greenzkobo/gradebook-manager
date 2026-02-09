@@ -4,6 +4,7 @@
 A web-based school grades management system that allows teachers and administrators to track student performance, manage subjects, and record grades efficiently.
 
 ## Recent Changes
+- February 2026: Renamed Grades tab to Gradebook with prominent subject filtering tabs
 - February 2026: Added Teachers management with subject assignment (many-to-many)
 - January 2026: Initial MVP implementation with students, subjects, and grades management
 
@@ -32,7 +33,7 @@ A web-based school grades management system that allows teachers and administrat
 1. **Dashboard** (`/`): Overview with statistics and recent grades
 2. **Students** (`/students`): CRUD operations for student records
 3. **Subjects** (`/subjects`): CRUD operations for course subjects
-4. **Grades** (`/grades`): Record and manage student grades with filters
+4. **Gradebook** (`/grades`): Record and manage student grades with subject filtering tabs
 5. **Teachers** (`/teachers`): Manage teachers and assign subjects to them
 
 ### API Endpoints
