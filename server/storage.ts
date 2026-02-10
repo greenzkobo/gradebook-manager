@@ -1,4 +1,13 @@
+import { eq, and } from "drizzle-orm";
+import { db } from "./db";
 import {
+  users,
+  students,
+  subjects,
+  grades,
+  categoryWeights,
+  teachers,
+  teacherSubjects,
   type User,
   type InsertUser,
   type Student,
@@ -14,7 +23,6 @@ import {
   type CategoryWeight,
   type InsertCategoryWeight,
 } from "@shared/schema";
-import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -64,314 +72,223 @@ export interface IStorage {
   removeTeacherSubjectsBySubject(subjectId: string): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private students: Map<string, Student>;
-  private subjects: Map<string, Subject>;
-  private grades: Map<string, Grade>;
-  private teachers: Map<string, Teacher>;
-  private teacherSubjects: Map<string, TeacherSubject>;
-  private categoryWeightsMap: Map<string, CategoryWeight>;
-
-  constructor() {
-    this.users = new Map();
-    this.students = new Map();
-    this.subjects = new Map();
-    this.grades = new Map();
-    this.teachers = new Map();
-    this.teacherSubjects = new Map();
-    this.categoryWeightsMap = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async getStudents(): Promise<Student[]> {
-    return Array.from(this.students.values());
+    return db.select().from(students);
   }
 
   async getStudent(id: string): Promise<Student | undefined> {
-    return this.students.get(id);
+    const [student] = await db.select().from(students).where(eq(students.id, id));
+    return student;
   }
 
   async createStudent(insertStudent: InsertStudent): Promise<Student> {
-    const id = randomUUID();
-    const student: Student = {
-      id,
-      fullName: insertStudent.fullName,
-      gradeLevel: insertStudent.gradeLevel,
-      email: insertStudent.email ?? null,
-    };
-    this.students.set(id, student);
+    const [student] = await db.insert(students).values(insertStudent).returning();
     return student;
   }
 
   async updateStudent(id: string, insertStudent: InsertStudent): Promise<Student | undefined> {
-    const existing = this.students.get(id);
-    if (!existing) return undefined;
-    const updated: Student = {
-      id,
-      fullName: insertStudent.fullName,
-      gradeLevel: insertStudent.gradeLevel,
-      email: insertStudent.email ?? null,
-    };
-    this.students.set(id, updated);
-    return updated;
+    const [student] = await db
+      .update(students)
+      .set(insertStudent)
+      .where(eq(students.id, id))
+      .returning();
+    return student;
   }
 
   async deleteStudent(id: string): Promise<boolean> {
-    return this.students.delete(id);
+    const result = await db.delete(students).where(eq(students.id, id)).returning();
+    return result.length > 0;
   }
 
   async getSubjects(): Promise<Subject[]> {
-    return Array.from(this.subjects.values());
+    return db.select().from(subjects);
   }
 
   async getSubject(id: string): Promise<Subject | undefined> {
-    return this.subjects.get(id);
+    const [subject] = await db.select().from(subjects).where(eq(subjects.id, id));
+    return subject;
   }
 
   async createSubject(insertSubject: InsertSubject): Promise<Subject> {
-    const id = randomUUID();
-    const subject: Subject = {
-      id,
-      name: insertSubject.name,
-      description: insertSubject.description ?? null,
-    };
-    this.subjects.set(id, subject);
+    const [subject] = await db.insert(subjects).values(insertSubject).returning();
     return subject;
   }
 
   async updateSubject(id: string, insertSubject: InsertSubject): Promise<Subject | undefined> {
-    const existing = this.subjects.get(id);
-    if (!existing) return undefined;
-    const updated: Subject = {
-      id,
-      name: insertSubject.name,
-      description: insertSubject.description ?? null,
-    };
-    this.subjects.set(id, updated);
-    return updated;
+    const [subject] = await db
+      .update(subjects)
+      .set(insertSubject)
+      .where(eq(subjects.id, id))
+      .returning();
+    return subject;
   }
 
   async deleteSubject(id: string): Promise<boolean> {
-    return this.subjects.delete(id);
+    const result = await db.delete(subjects).where(eq(subjects.id, id)).returning();
+    return result.length > 0;
   }
 
   async getGrades(): Promise<Grade[]> {
-    return Array.from(this.grades.values());
+    return db.select().from(grades);
   }
 
   async getGrade(id: string): Promise<Grade | undefined> {
-    return this.grades.get(id);
+    const [grade] = await db.select().from(grades).where(eq(grades.id, id));
+    return grade;
   }
 
   async getGradesByStudent(studentId: string): Promise<Grade[]> {
-    return Array.from(this.grades.values()).filter((g) => g.studentId === studentId);
+    return db.select().from(grades).where(eq(grades.studentId, studentId));
   }
 
   async getGradesBySubject(subjectId: string): Promise<Grade[]> {
-    return Array.from(this.grades.values()).filter((g) => g.subjectId === subjectId);
+    return db.select().from(grades).where(eq(grades.subjectId, subjectId));
   }
 
   async createGrade(insertGrade: InsertGrade): Promise<Grade> {
-    const id = randomUUID();
-    const grade: Grade = {
-      id,
-      studentId: insertGrade.studentId,
-      subjectId: insertGrade.subjectId,
-      assignmentName: insertGrade.assignmentName ?? null,
-      score: insertGrade.score,
-      maxScore: insertGrade.maxScore ?? 100,
-      category: insertGrade.category ?? null,
-      term: insertGrade.term ?? null,
-      date: insertGrade.date ?? null,
-      fileName: insertGrade.fileName ?? null,
-      fileUrl: insertGrade.fileUrl ?? null,
-    };
-    this.grades.set(id, grade);
+    const [grade] = await db.insert(grades).values(insertGrade).returning();
     return grade;
   }
 
   async updateGrade(id: string, insertGrade: InsertGrade): Promise<Grade | undefined> {
-    const existing = this.grades.get(id);
-    if (!existing) return undefined;
-    const updated: Grade = {
-      id,
-      studentId: insertGrade.studentId,
-      subjectId: insertGrade.subjectId,
-      assignmentName: insertGrade.assignmentName ?? existing.assignmentName,
-      score: insertGrade.score,
-      maxScore: insertGrade.maxScore ?? 100,
-      category: insertGrade.category ?? null,
-      term: insertGrade.term ?? null,
-      date: insertGrade.date ?? null,
-      fileName: insertGrade.fileName ?? existing.fileName,
-      fileUrl: insertGrade.fileUrl ?? existing.fileUrl,
-    };
-    this.grades.set(id, updated);
-    return updated;
+    const [grade] = await db
+      .update(grades)
+      .set(insertGrade)
+      .where(eq(grades.id, id))
+      .returning();
+    return grade;
   }
 
   async deleteGrade(id: string): Promise<boolean> {
-    return this.grades.delete(id);
+    const result = await db.delete(grades).where(eq(grades.id, id)).returning();
+    return result.length > 0;
   }
 
   async deleteGradesByStudent(studentId: string): Promise<void> {
-    const toDelete = Array.from(this.grades.entries())
-      .filter(([, g]) => g.studentId === studentId)
-      .map(([id]) => id);
-    toDelete.forEach((id) => this.grades.delete(id));
+    await db.delete(grades).where(eq(grades.studentId, studentId));
   }
 
   async deleteGradesBySubject(subjectId: string): Promise<void> {
-    const toDelete = Array.from(this.grades.entries())
-      .filter(([, g]) => g.subjectId === subjectId)
-      .map(([id]) => id);
-    toDelete.forEach((id) => this.grades.delete(id));
+    await db.delete(grades).where(eq(grades.subjectId, subjectId));
   }
 
   async getCategoryWeights(subjectId: string): Promise<CategoryWeight[]> {
-    return Array.from(this.categoryWeightsMap.values()).filter(
-      (cw) => cw.subjectId === subjectId
-    );
+    return db.select().from(categoryWeights).where(eq(categoryWeights.subjectId, subjectId));
   }
 
   async getAllCategoryWeights(): Promise<CategoryWeight[]> {
-    return Array.from(this.categoryWeightsMap.values());
+    return db.select().from(categoryWeights);
   }
 
   async setCategoryWeight(data: InsertCategoryWeight): Promise<CategoryWeight> {
-    const existing = Array.from(this.categoryWeightsMap.values()).find(
-      (cw) => cw.subjectId === data.subjectId && cw.category === data.category
-    );
+    const [existing] = await db
+      .select()
+      .from(categoryWeights)
+      .where(
+        and(
+          eq(categoryWeights.subjectId, data.subjectId),
+          eq(categoryWeights.category, data.category),
+        ),
+      );
     if (existing) {
-      const updated: CategoryWeight = { ...existing, weight: data.weight };
-      this.categoryWeightsMap.set(existing.id, updated);
+      const [updated] = await db
+        .update(categoryWeights)
+        .set({ weight: data.weight })
+        .where(eq(categoryWeights.id, existing.id))
+        .returning();
       return updated;
     }
-    const id = randomUUID();
-    const cw: CategoryWeight = {
-      id,
-      subjectId: data.subjectId,
-      category: data.category,
-      weight: data.weight,
-    };
-    this.categoryWeightsMap.set(id, cw);
-    return cw;
+    const [created] = await db.insert(categoryWeights).values(data).returning();
+    return created;
   }
 
   async updateCategoryWeight(id: string, data: InsertCategoryWeight): Promise<CategoryWeight | undefined> {
-    const existing = this.categoryWeightsMap.get(id);
-    if (!existing) return undefined;
-    const updated: CategoryWeight = {
-      id,
-      subjectId: data.subjectId,
-      category: data.category,
-      weight: data.weight,
-    };
-    this.categoryWeightsMap.set(id, updated);
+    const [updated] = await db
+      .update(categoryWeights)
+      .set(data)
+      .where(eq(categoryWeights.id, id))
+      .returning();
     return updated;
   }
 
   async deleteCategoryWeight(id: string): Promise<boolean> {
-    return this.categoryWeightsMap.delete(id);
+    const result = await db.delete(categoryWeights).where(eq(categoryWeights.id, id)).returning();
+    return result.length > 0;
   }
 
   async deleteCategoryWeightsBySubject(subjectId: string): Promise<void> {
-    const toDelete = Array.from(this.categoryWeightsMap.entries())
-      .filter(([, cw]) => cw.subjectId === subjectId)
-      .map(([id]) => id);
-    toDelete.forEach((id) => this.categoryWeightsMap.delete(id));
+    await db.delete(categoryWeights).where(eq(categoryWeights.subjectId, subjectId));
   }
 
   async getTeachers(): Promise<Teacher[]> {
-    return Array.from(this.teachers.values());
+    return db.select().from(teachers);
   }
 
   async getTeacher(id: string): Promise<Teacher | undefined> {
-    return this.teachers.get(id);
+    const [teacher] = await db.select().from(teachers).where(eq(teachers.id, id));
+    return teacher;
   }
 
   async createTeacher(insertTeacher: InsertTeacher): Promise<Teacher> {
-    const id = randomUUID();
-    const teacher: Teacher = {
-      id,
-      fullName: insertTeacher.fullName,
-      email: insertTeacher.email ?? null,
-    };
-    this.teachers.set(id, teacher);
+    const [teacher] = await db.insert(teachers).values(insertTeacher).returning();
     return teacher;
   }
 
   async updateTeacher(id: string, insertTeacher: InsertTeacher): Promise<Teacher | undefined> {
-    const existing = this.teachers.get(id);
-    if (!existing) return undefined;
-    const updated: Teacher = {
-      id,
-      fullName: insertTeacher.fullName,
-      email: insertTeacher.email ?? null,
-    };
-    this.teachers.set(id, updated);
-    return updated;
+    const [teacher] = await db
+      .update(teachers)
+      .set(insertTeacher)
+      .where(eq(teachers.id, id))
+      .returning();
+    return teacher;
   }
 
   async deleteTeacher(id: string): Promise<boolean> {
-    return this.teachers.delete(id);
+    const result = await db.delete(teachers).where(eq(teachers.id, id)).returning();
+    return result.length > 0;
   }
 
   async getTeacherSubjects(teacherId: string): Promise<TeacherSubject[]> {
-    return Array.from(this.teacherSubjects.values()).filter(
-      (ts) => ts.teacherId === teacherId
-    );
+    return db.select().from(teacherSubjects).where(eq(teacherSubjects.teacherId, teacherId));
   }
 
   async getAllTeacherSubjects(): Promise<TeacherSubject[]> {
-    return Array.from(this.teacherSubjects.values());
+    return db.select().from(teacherSubjects);
   }
 
   async assignSubjectToTeacher(insert: InsertTeacherSubject): Promise<TeacherSubject> {
-    const id = randomUUID();
-    const assignment: TeacherSubject = {
-      id,
-      teacherId: insert.teacherId,
-      subjectId: insert.subjectId,
-    };
-    this.teacherSubjects.set(id, assignment);
+    const [assignment] = await db.insert(teacherSubjects).values(insert).returning();
     return assignment;
   }
 
   async removeTeacherSubject(id: string): Promise<boolean> {
-    return this.teacherSubjects.delete(id);
+    const result = await db.delete(teacherSubjects).where(eq(teacherSubjects.id, id)).returning();
+    return result.length > 0;
   }
 
   async removeTeacherSubjectsByTeacher(teacherId: string): Promise<void> {
-    const toDelete = Array.from(this.teacherSubjects.entries())
-      .filter(([, ts]) => ts.teacherId === teacherId)
-      .map(([id]) => id);
-    toDelete.forEach((id) => this.teacherSubjects.delete(id));
+    await db.delete(teacherSubjects).where(eq(teacherSubjects.teacherId, teacherId));
   }
 
   async removeTeacherSubjectsBySubject(subjectId: string): Promise<void> {
-    const toDelete = Array.from(this.teacherSubjects.entries())
-      .filter(([, ts]) => ts.subjectId === subjectId)
-      .map(([id]) => id);
-    toDelete.forEach((id) => this.teacherSubjects.delete(id));
+    await db.delete(teacherSubjects).where(eq(teacherSubjects.subjectId, subjectId));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

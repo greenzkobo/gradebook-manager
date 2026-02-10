@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { insertStudentSchema, insertSubjectSchema, insertGradeSchema, insertTeacherSchema, insertTeacherSubjectSchema, insertCategoryWeightSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -63,6 +64,15 @@ export async function registerRoutes(
       res.sendFile(filePath);
     } else {
       res.status(404).json({ error: "File not found" });
+    }
+  });
+
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const result = await pool.query("SELECT NOW()");
+      res.json({ status: "ok", timestamp: result.rows[0].now });
+    } catch (error) {
+      res.status(500).json({ status: "error", message: "Database connection failed" });
     }
   });
 

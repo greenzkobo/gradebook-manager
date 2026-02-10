@@ -24,7 +24,8 @@ A web-based school grades management system that allows teachers and administrat
 
 ### Backend (Express + Node.js)
 - **Framework**: Express.js with TypeScript
-- **Storage**: In-memory storage (MemStorage class)
+- **Database**: PostgreSQL via Drizzle ORM (server/db.ts connection pool)
+- **Storage**: DatabaseStorage class in server/storage.ts (implements IStorage interface with Drizzle queries)
 - **Validation**: Zod schemas from drizzle-zod
 
 ### Data Models
