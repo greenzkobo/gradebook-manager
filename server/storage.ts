@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -8,6 +8,10 @@ import {
   categoryWeights,
   teachers,
   teacherSubjects,
+  academicYears,
+  terms,
+  sections,
+  enrollments,
   type User,
   type InsertUser,
   type Student,
@@ -22,6 +26,14 @@ import {
   type InsertTeacherSubject,
   type CategoryWeight,
   type InsertCategoryWeight,
+  type AcademicYear,
+  type InsertAcademicYear,
+  type Term,
+  type InsertTerm,
+  type Section,
+  type InsertSection,
+  type Enrollment,
+  type InsertEnrollment,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -70,6 +82,31 @@ export interface IStorage {
   removeTeacherSubject(id: string): Promise<boolean>;
   removeTeacherSubjectsByTeacher(teacherId: string): Promise<void>;
   removeTeacherSubjectsBySubject(subjectId: string): Promise<void>;
+
+  getAcademicYears(): Promise<AcademicYear[]>;
+  getAcademicYear(id: string): Promise<AcademicYear | undefined>;
+  createAcademicYear(data: InsertAcademicYear): Promise<AcademicYear>;
+  updateAcademicYear(id: string, data: InsertAcademicYear): Promise<AcademicYear | undefined>;
+  deleteAcademicYear(id: string): Promise<boolean>;
+  deactivateAllAcademicYears(exceptId?: string): Promise<void>;
+
+  getTerms(): Promise<Term[]>;
+  getTerm(id: string): Promise<Term | undefined>;
+  getTermsByAcademicYear(academicYearId: string): Promise<Term[]>;
+  createTerm(data: InsertTerm): Promise<Term>;
+  deleteTerm(id: string): Promise<boolean>;
+  deactivateAllTerms(exceptId?: string): Promise<void>;
+
+  getSections(): Promise<Section[]>;
+  getSection(id: string): Promise<Section | undefined>;
+  createSection(data: InsertSection): Promise<Section>;
+  deleteSection(id: string): Promise<boolean>;
+
+  getEnrollments(): Promise<Enrollment[]>;
+  getEnrollmentsBySection(sectionId: string): Promise<Enrollment[]>;
+  createEnrollment(data: InsertEnrollment): Promise<Enrollment>;
+  deleteEnrollment(id: string): Promise<boolean>;
+  deleteEnrollmentsBySection(sectionId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -288,6 +325,110 @@ export class DatabaseStorage implements IStorage {
 
   async removeTeacherSubjectsBySubject(subjectId: string): Promise<void> {
     await db.delete(teacherSubjects).where(eq(teacherSubjects.subjectId, subjectId));
+  }
+
+  async getAcademicYears(): Promise<AcademicYear[]> {
+    return db.select().from(academicYears);
+  }
+
+  async getAcademicYear(id: string): Promise<AcademicYear | undefined> {
+    const [year] = await db.select().from(academicYears).where(eq(academicYears.id, id));
+    return year;
+  }
+
+  async createAcademicYear(data: InsertAcademicYear): Promise<AcademicYear> {
+    const [year] = await db.insert(academicYears).values(data).returning();
+    return year;
+  }
+
+  async updateAcademicYear(id: string, data: InsertAcademicYear): Promise<AcademicYear | undefined> {
+    const [year] = await db.update(academicYears).set(data).where(eq(academicYears.id, id)).returning();
+    return year;
+  }
+
+  async deleteAcademicYear(id: string): Promise<boolean> {
+    const result = await db.delete(academicYears).where(eq(academicYears.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deactivateAllAcademicYears(exceptId?: string): Promise<void> {
+    if (exceptId) {
+      await db.update(academicYears).set({ isActive: false }).where(ne(academicYears.id, exceptId));
+    } else {
+      await db.update(academicYears).set({ isActive: false });
+    }
+  }
+
+  async getTerms(): Promise<Term[]> {
+    return db.select().from(terms);
+  }
+
+  async getTerm(id: string): Promise<Term | undefined> {
+    const [term] = await db.select().from(terms).where(eq(terms.id, id));
+    return term;
+  }
+
+  async getTermsByAcademicYear(academicYearId: string): Promise<Term[]> {
+    return db.select().from(terms).where(eq(terms.academicYearId, academicYearId));
+  }
+
+  async createTerm(data: InsertTerm): Promise<Term> {
+    const [term] = await db.insert(terms).values(data).returning();
+    return term;
+  }
+
+  async deleteTerm(id: string): Promise<boolean> {
+    const result = await db.delete(terms).where(eq(terms.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deactivateAllTerms(exceptId?: string): Promise<void> {
+    if (exceptId) {
+      await db.update(terms).set({ isActive: false }).where(ne(terms.id, exceptId));
+    } else {
+      await db.update(terms).set({ isActive: false });
+    }
+  }
+
+  async getSections(): Promise<Section[]> {
+    return db.select().from(sections);
+  }
+
+  async getSection(id: string): Promise<Section | undefined> {
+    const [section] = await db.select().from(sections).where(eq(sections.id, id));
+    return section;
+  }
+
+  async createSection(data: InsertSection): Promise<Section> {
+    const [section] = await db.insert(sections).values(data).returning();
+    return section;
+  }
+
+  async deleteSection(id: string): Promise<boolean> {
+    const result = await db.delete(sections).where(eq(sections.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getEnrollments(): Promise<Enrollment[]> {
+    return db.select().from(enrollments);
+  }
+
+  async getEnrollmentsBySection(sectionId: string): Promise<Enrollment[]> {
+    return db.select().from(enrollments).where(eq(enrollments.sectionId, sectionId));
+  }
+
+  async createEnrollment(data: InsertEnrollment): Promise<Enrollment> {
+    const [enrollment] = await db.insert(enrollments).values(data).returning();
+    return enrollment;
+  }
+
+  async deleteEnrollment(id: string): Promise<boolean> {
+    const result = await db.delete(enrollments).where(eq(enrollments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async deleteEnrollmentsBySection(sectionId: string): Promise<void> {
+    await db.delete(enrollments).where(eq(enrollments.sectionId, sectionId));
   }
 }
 

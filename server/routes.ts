@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { pool } from "./db";
-import { insertStudentSchema, insertSubjectSchema, insertGradeSchema, insertTeacherSchema, insertTeacherSubjectSchema, insertCategoryWeightSchema } from "@shared/schema";
+import { insertStudentSchema, insertSubjectSchema, insertGradeSchema, insertTeacherSchema, insertTeacherSubjectSchema, insertCategoryWeightSchema, insertAcademicYearSchema, insertTermSchema, insertSectionSchema, insertEnrollmentSchema, ENROLLMENT_STATUSES } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -470,6 +470,238 @@ export async function registerRoutes(
     const deleted = await storage.removeTeacherSubject(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: "Assignment not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Academic Years API
+  app.get("/api/academic-years", async (_req, res) => {
+    const years = await storage.getAcademicYears();
+    res.json(years);
+  });
+
+  app.get("/api/academic-years/:id", async (req, res) => {
+    const year = await storage.getAcademicYear(req.params.id);
+    if (!year) {
+      return res.status(404).json({ error: "Academic year not found" });
+    }
+    res.json(year);
+  });
+
+  app.post("/api/academic-years", async (req, res) => {
+    try {
+      const data = insertAcademicYearSchema.parse(req.body);
+      if (data.isActive) {
+        await storage.deactivateAllAcademicYears();
+      }
+      const year = await storage.createAcademicYear(data);
+      res.status(201).json(year);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create academic year" });
+    }
+  });
+
+  app.put("/api/academic-years/:id", async (req, res) => {
+    try {
+      const data = insertAcademicYearSchema.parse(req.body);
+      if (data.isActive) {
+        await storage.deactivateAllAcademicYears(req.params.id);
+      }
+      const year = await storage.updateAcademicYear(req.params.id, data);
+      if (!year) {
+        return res.status(404).json({ error: "Academic year not found" });
+      }
+      res.json(year);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update academic year" });
+    }
+  });
+
+  app.delete("/api/academic-years/:id", async (req, res) => {
+    const termsForYear = await storage.getTermsByAcademicYear(req.params.id);
+    if (termsForYear.length > 0) {
+      return res.status(400).json({ error: "Cannot delete academic year with existing terms. Delete terms first." });
+    }
+    const deleted = await storage.deleteAcademicYear(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Academic year not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Terms API
+  app.get("/api/terms", async (_req, res) => {
+    const allTerms = await storage.getTerms();
+    res.json(allTerms);
+  });
+
+  app.post("/api/terms", async (req, res) => {
+    try {
+      const data = insertTermSchema.parse(req.body);
+      const year = await storage.getAcademicYear(data.academicYearId);
+      if (!year) {
+        return res.status(400).json({ error: "Academic year not found" });
+      }
+      if (data.isActive) {
+        await storage.deactivateAllTerms();
+      }
+      const term = await storage.createTerm(data);
+      res.status(201).json(term);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create term" });
+    }
+  });
+
+  app.delete("/api/terms/:id", async (req, res) => {
+    const allSections = await storage.getSections();
+    const sectionsForTerm = allSections.filter((s) => s.termId === req.params.id);
+    if (sectionsForTerm.length > 0) {
+      return res.status(400).json({ error: "Cannot delete term with existing sections. Delete sections first." });
+    }
+    const deleted = await storage.deleteTerm(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Term not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Sections API
+  app.get("/api/sections", async (_req, res) => {
+    const allSections = await storage.getSections();
+    res.json(allSections);
+  });
+
+  app.get("/api/sections/:id", async (req, res) => {
+    const section = await storage.getSection(req.params.id);
+    if (!section) {
+      return res.status(404).json({ error: "Section not found" });
+    }
+    const sectionEnrollments = await storage.getEnrollmentsBySection(section.id);
+    const enrolledCount = sectionEnrollments.filter((e) => e.status === "active").length;
+    res.json({ ...section, enrolledCount });
+  });
+
+  app.post("/api/sections", async (req, res) => {
+    try {
+      const data = insertSectionSchema.parse(req.body);
+      const subject = await storage.getSubject(data.subjectId);
+      if (!subject) {
+        return res.status(400).json({ error: "Subject not found" });
+      }
+      const teacher = await storage.getTeacher(data.teacherId);
+      if (!teacher) {
+        return res.status(400).json({ error: "Teacher not found" });
+      }
+      const term = await storage.getTerm(data.termId);
+      if (!term) {
+        return res.status(400).json({ error: "Term not found" });
+      }
+      const section = await storage.createSection(data);
+      res.status(201).json(section);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create section" });
+    }
+  });
+
+  app.delete("/api/sections/:id", async (req, res) => {
+    await storage.deleteEnrollmentsBySection(req.params.id);
+    const deleted = await storage.deleteSection(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Section not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Enrollments API
+  app.get("/api/enrollments", async (_req, res) => {
+    const allEnrollments = await storage.getEnrollments();
+    res.json(allEnrollments);
+  });
+
+  app.post("/api/enrollments", async (req, res) => {
+    try {
+      const data = insertEnrollmentSchema.parse(req.body);
+      if (!ENROLLMENT_STATUSES.includes(data.status as any)) {
+        return res.status(400).json({ error: "Invalid status. Must be: active, dropped, or completed" });
+      }
+      const student = await storage.getStudent(data.studentId);
+      if (!student) {
+        return res.status(400).json({ error: "Student not found" });
+      }
+      const section = await storage.getSection(data.sectionId);
+      if (!section) {
+        return res.status(400).json({ error: "Section not found" });
+      }
+      const existingEnrollments = await storage.getEnrollmentsBySection(data.sectionId);
+      if (existingEnrollments.some((e) => e.studentId === data.studentId && e.status === "active")) {
+        return res.status(400).json({ error: "Student already enrolled in this section" });
+      }
+      const enrollment = await storage.createEnrollment(data);
+      res.status(201).json(enrollment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create enrollment" });
+    }
+  });
+
+  app.post("/api/enrollments/bulk", async (req, res) => {
+    try {
+      const { sectionId, studentIds, enrollDate, status } = req.body;
+      if (!sectionId || !Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ error: "sectionId and studentIds array are required" });
+      }
+      const section = await storage.getSection(sectionId);
+      if (!section) {
+        return res.status(400).json({ error: "Section not found" });
+      }
+      const existingEnrollments = await storage.getEnrollmentsBySection(sectionId);
+      const enrollmentDate = enrollDate || new Date().toISOString().split("T")[0];
+      const enrollmentStatus = status || "active";
+      if (!ENROLLMENT_STATUSES.includes(enrollmentStatus as any)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const created = [];
+      for (const studentId of studentIds) {
+        const student = await storage.getStudent(studentId);
+        if (!student) continue;
+        if (existingEnrollments.some((e) => e.studentId === studentId && e.status === "active")) continue;
+        const data = insertEnrollmentSchema.parse({
+          studentId,
+          sectionId,
+          enrollDate: enrollmentDate,
+          status: enrollmentStatus,
+        });
+        const enrollment = await storage.createEnrollment(data);
+        created.push(enrollment);
+      }
+      res.status(201).json(created);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create enrollments" });
+    }
+  });
+
+  app.delete("/api/enrollments/:id", async (req, res) => {
+    const deleted = await storage.deleteEnrollment(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Enrollment not found" });
     }
     res.status(204).send();
   });

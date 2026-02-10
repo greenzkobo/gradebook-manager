@@ -4,6 +4,7 @@
 A web-based school grades management system that allows teachers and administrators to track student performance, manage subjects, and record grades efficiently.
 
 ## Recent Changes
+- February 2026: Added academic structure (academicYears, terms, sections, enrollments) with full CRUD API
 - February 2026: Added double-click inline editing for scores and assignment names in Gradebook
 - February 2026: Added "Assign to All Students" bulk grade creation with file attachment sharing
 - February 2026: Added assignment names to grades, shown in gradebook with inline rename support
@@ -35,6 +36,10 @@ A web-based school grades management system that allows teachers and administrat
 - **CategoryWeights**: id, subjectId, category, weight (percentage)
 - **Teachers**: id, fullName, email (optional)
 - **TeacherSubjects**: id, teacherId, subjectId (many-to-many assignments)
+- **AcademicYears**: id, name, startDate, endDate, isActive (only one active at a time)
+- **Terms**: id, academicYearId, name, startDate, endDate, isActive
+- **Sections**: id, subjectId, teacherId, termId, sectionName, roomNumber (optional)
+- **Enrollments**: id, studentId, sectionId, enrollDate, status (active/dropped/completed)
 
 ### Key Pages
 1. **Dashboard** (`/`): Overview with statistics and recent grades
@@ -59,6 +64,14 @@ A web-based school grades management system that allows teachers and administrat
 - `GET/POST /api/teacher-subjects` - List/Create teacher-subject assignments
 - `GET /api/teacher-subjects/:teacherId` - Get assignments for a teacher
 - `DELETE /api/teacher-subjects/:id` - Remove assignment
+- `GET/POST /api/academic-years` - List/Create academic years
+- `GET/PUT/DELETE /api/academic-years/:id` - Academic year CRUD
+- `GET/POST /api/terms` - List/Create terms (validates academicYearId)
+- `GET/POST /api/sections` - List/Create sections (validates subjectId, teacherId, termId)
+- `GET /api/sections/:id` - Get section with enrolledCount
+- `GET/POST /api/enrollments` - List/Create enrollments (validates student/section, prevents duplicates)
+- `POST /api/enrollments/bulk` - Bulk enroll multiple students in a section
+- `DELETE /api/enrollments/:id` - Remove enrollment
 
 ## Development Commands
 - `npm run dev` - Start development server (frontend + backend)
