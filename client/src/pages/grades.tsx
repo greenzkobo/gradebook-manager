@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -13,13 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, ClipboardList, Search, BookOpen, Upload, FileText, Download, Settings2, X } from "lucide-react";
-import { GRADE_CATEGORIES, type Grade, type Student, type Subject, type CategoryWeight } from "@shared/schema";
+import { Plus, Pencil, Trash2, ClipboardList, Search, BookOpen, Upload, FileText, Download, Settings2, X, Users, Check } from "lucide-react";
+import { GRADE_CATEGORIES, type Grade, type Student, type Subject, type CategoryWeight, type Teacher, type TeacherSubject } from "@shared/schema";
 
 const gradeFormSchema = z.object({
-  studentId: z.string().min(1, "Please select a student"),
+  studentId: z.string().optional(),
   subjectId: z.string().min(1, "Please select a subject"),
+  assignmentName: z.string().optional().nullable(),
   score: z.coerce.number().min(0, "Score must be at least 0").max(1000, "Score too high"),
   maxScore: z.coerce.number().min(1, "Max score must be at least 1").max(1000, "Max score too high"),
   category: z.string().optional().nullable(),
@@ -40,7 +42,11 @@ export default function Grades() {
   const [weightsDialogOpen, setWeightsDialogOpen] = useState(false);
   const [weightsSubjectId, setWeightsSubjectId] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [forAllStudents, setForAllStudents] = useState(false);
+  const [inlineEdit, setInlineEdit] = useState<{ gradeId: string; field: string } | null>(null);
+  const [inlineValue, setInlineValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: grades = [], isLoading } = useQuery<Grade[]>({
@@ -59,9 +65,17 @@ export default function Grades() {
     queryKey: ["/api/category-weights"],
   });
 
+  const { data: teachers = [] } = useQuery<Teacher[]>({
+    queryKey: ["/api/teachers"],
+  });
+
+  const { data: teacherSubjects = [] } = useQuery<TeacherSubject[]>({
+    queryKey: ["/api/teacher-subjects"],
+  });
+
   const form = useForm<GradeFormValues>({
     resolver: zodResolver(gradeFormSchema),
-    defaultValues: { studentId: "", subjectId: "", score: 0, maxScore: 100, category: "", term: "" },
+    defaultValues: { studentId: "", subjectId: "", assignmentName: "", score: 0, maxScore: 100, category: "", term: "" },
   });
 
   const createMutation = useMutation({
@@ -75,10 +89,31 @@ export default function Grades() {
       toast({ title: "Grade recorded successfully" });
       setOpen(false);
       setSelectedFile(null);
-      form.reset({ studentId: "", subjectId: "", score: 0, maxScore: 100, category: "", term: "" });
+      setForAllStudents(false);
+      form.reset({ studentId: "", subjectId: "", assignmentName: "", score: 0, maxScore: 100, category: "", term: "" });
     },
     onError: () => {
       toast({ title: "Failed to record grade", variant: "destructive" });
+    },
+  });
+
+  const bulkCreateMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch("/api/grades/bulk", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      const count = Array.isArray(data) ? data.length : 1;
+      toast({ title: `Assignment created for ${count} students` });
+      setOpen(false);
+      setSelectedFile(null);
+      setForAllStudents(false);
+      form.reset({ studentId: "", subjectId: "", assignmentName: "", score: 0, maxScore: 100, category: "", term: "" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create assignment", variant: "destructive" });
     },
   });
 
@@ -94,10 +129,38 @@ export default function Grades() {
       setOpen(false);
       setEditingGrade(null);
       setSelectedFile(null);
-      form.reset({ studentId: "", subjectId: "", score: 0, maxScore: 100, category: "", term: "" });
+      form.reset({ studentId: "", subjectId: "", assignmentName: "", score: 0, maxScore: 100, category: "", term: "" });
     },
     onError: () => {
       toast({ title: "Failed to update grade", variant: "destructive" });
+    },
+  });
+
+  const inlineUpdateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, string | number> }) => {
+      const grade = grades.find((g) => g.id === id);
+      if (!grade) throw new Error("Grade not found");
+      const formData = new FormData();
+      formData.append("studentId", grade.studentId);
+      formData.append("subjectId", grade.subjectId);
+      formData.append("score", String(updates.score ?? grade.score));
+      formData.append("maxScore", String(updates.maxScore ?? grade.maxScore));
+      formData.append("assignmentName", String(updates.assignmentName ?? grade.assignmentName ?? ""));
+      if (grade.category) formData.append("category", grade.category);
+      if (grade.term) formData.append("term", grade.term);
+      formData.append("date", grade.date || new Date().toISOString().split("T")[0]);
+      const res = await fetch(`/api/grades/${id}`, { method: "PUT", body: formData });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      toast({ title: "Updated" });
+      setInlineEdit(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to update", variant: "destructive" });
+      setInlineEdit(null);
     },
   });
 
@@ -135,27 +198,33 @@ export default function Grades() {
 
   const onSubmit = (data: GradeFormValues) => {
     const formData = new FormData();
-    formData.append("studentId", data.studentId);
     formData.append("subjectId", data.subjectId);
     formData.append("score", String(data.score));
     formData.append("maxScore", String(data.maxScore));
+    if (data.assignmentName) formData.append("assignmentName", data.assignmentName);
     if (data.category) formData.append("category", data.category);
     if (data.term) formData.append("term", data.term);
     formData.append("date", new Date().toISOString().split("T")[0]);
     if (selectedFile) formData.append("file", selectedFile);
 
     if (editingGrade) {
+      formData.append("studentId", data.studentId || editingGrade.studentId);
       updateMutation.mutate({ id: editingGrade.id, formData });
+    } else if (forAllStudents) {
+      bulkCreateMutation.mutate(formData);
     } else {
+      formData.append("studentId", data.studentId || "");
       createMutation.mutate(formData);
     }
   };
 
   const handleEdit = (grade: Grade) => {
     setEditingGrade(grade);
+    setForAllStudents(false);
     form.reset({
       studentId: grade.studentId,
       subjectId: grade.subjectId,
+      assignmentName: grade.assignmentName || "",
       score: grade.score,
       maxScore: grade.maxScore,
       category: grade.category || "",
@@ -169,16 +238,73 @@ export default function Grades() {
     setOpen(false);
     setEditingGrade(null);
     setSelectedFile(null);
-    form.reset({ studentId: "", subjectId: "", score: 0, maxScore: 100, category: "", term: "" });
+    setForAllStudents(false);
+    form.reset({ studentId: "", subjectId: "", assignmentName: "", score: 0, maxScore: 100, category: "", term: "" });
   };
+
+  const handleDoubleClick = (gradeId: string, field: string, currentValue: string | number) => {
+    setInlineEdit({ gradeId, field });
+    setInlineValue(String(currentValue));
+  };
+
+  const commitInlineEdit = () => {
+    if (!inlineEdit) return;
+    const { gradeId, field } = inlineEdit;
+    const grade = grades.find((g) => g.id === gradeId);
+    if (!grade) return;
+
+    if (field === "score") {
+      const numVal = Number(inlineValue);
+      if (isNaN(numVal) || numVal < 0) {
+        setInlineEdit(null);
+        return;
+      }
+      if (numVal !== grade.score) {
+        inlineUpdateMutation.mutate({ id: gradeId, updates: { score: numVal } });
+      } else {
+        setInlineEdit(null);
+      }
+    } else if (field === "assignmentName") {
+      if (inlineValue !== (grade.assignmentName || "")) {
+        inlineUpdateMutation.mutate({ id: gradeId, updates: { assignmentName: inlineValue } });
+      } else {
+        setInlineEdit(null);
+      }
+    }
+  };
+
+  const handleInlineKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      commitInlineEdit();
+    } else if (e.key === "Escape") {
+      setInlineEdit(null);
+    }
+  };
+
+  useEffect(() => {
+    if (inlineEdit && inlineInputRef.current) {
+      inlineInputRef.current.focus();
+      inlineInputRef.current.select();
+    }
+  }, [inlineEdit]);
 
   const getStudentName = (id: string) => students.find((s) => s.id === id)?.fullName || "Unknown";
   const getSubjectName = (id: string) => subjects.find((s) => s.id === id)?.name || "Unknown";
 
+  const getTeachersForSubject = (subjectId: string): string => {
+    const assignments = teacherSubjects.filter((ts) => ts.subjectId === subjectId);
+    if (assignments.length === 0) return "";
+    return assignments
+      .map((a) => teachers.find((t) => t.id === a.teacherId)?.fullName)
+      .filter(Boolean)
+      .join(", ");
+  };
+
   const filteredGrades = grades.filter((g) => {
     const studentName = getStudentName(g.studentId).toLowerCase();
     const subjectName = getSubjectName(g.subjectId).toLowerCase();
-    const matchesSearch = studentName.includes(searchQuery.toLowerCase()) || subjectName.includes(searchQuery.toLowerCase());
+    const assignmentName = (g.assignmentName || "").toLowerCase();
+    const matchesSearch = studentName.includes(searchQuery.toLowerCase()) || subjectName.includes(searchQuery.toLowerCase()) || assignmentName.includes(searchQuery.toLowerCase());
     const matchesStudent = !filterStudent || filterStudent === "all" || g.studentId === filterStudent;
     const matchesSubject = !filterSubject || filterSubject === "all" || g.subjectId === filterSubject;
     return matchesSearch && matchesStudent && matchesSubject;
@@ -246,6 +372,9 @@ export default function Grades() {
     setWeightsDialogOpen(true);
   };
 
+  const showStudentField = !forAllStudents && !editingGrade;
+  const isPending = createMutation.isPending || updateMutation.isPending || bulkCreateMutation.isPending;
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -280,30 +409,45 @@ export default function Grades() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="studentId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Student</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-grade-student">
-                              <SelectValue placeholder="Select student" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {students.map((student) => (
-                              <SelectItem key={student.id} value={student.id} data-testid={`option-student-${student.id}`}>
-                                {student.fullName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!editingGrade && (
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-md border" data-testid="toggle-all-students">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Assign to all students</span>
+                      </div>
+                      <Switch
+                        checked={forAllStudents}
+                        onCheckedChange={setForAllStudents}
+                        data-testid="switch-all-students"
+                      />
+                    </div>
+                  )}
+                  {showStudentField && (
+                    <FormField
+                      control={form.control}
+                      name="studentId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Student</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-grade-student">
+                                <SelectValue placeholder="Select student" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {students.map((student) => (
+                                <SelectItem key={student.id} value={student.id} data-testid={`option-student-${student.id}`}>
+                                  {student.fullName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="subjectId"
@@ -324,6 +468,24 @@ export default function Grades() {
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="assignmentName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assignment Name (optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g. Chapter 5 Homework"
+                            {...field}
+                            value={field.value ?? ""}
+                            data-testid="input-assignment-name"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -432,7 +594,6 @@ export default function Grades() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6"
                             onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                             data-testid="button-remove-file"
                           >
@@ -446,6 +607,11 @@ export default function Grades() {
                         </span>
                       )}
                     </div>
+                    {forAllStudents && (
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        This file will be shared across all student grade entries
+                      </p>
+                    )}
                   </div>
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={handleDialogClose}>
@@ -453,10 +619,10 @@ export default function Grades() {
                     </Button>
                     <Button
                       type="submit"
-                      disabled={createMutation.isPending || updateMutation.isPending}
+                      disabled={isPending}
                       data-testid="button-submit-grade"
                     >
-                      {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingGrade ? "Update" : "Record Grade"}
+                      {isPending ? "Saving..." : editingGrade ? "Update" : forAllStudents ? "Assign to All" : "Record Grade"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -487,37 +653,51 @@ export default function Grades() {
             <BookOpen className="h-4 w-4 mr-2" />
             All Subjects
           </Button>
-          {subjects.map((subject) => (
-            <Button
-              key={subject.id}
-              variant={filterSubject === subject.id ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterSubject(filterSubject === subject.id ? "" : subject.id)}
-              data-testid={`filter-subject-${subject.id}`}
-            >
-              {subject.name}
-              {filterSubject === subject.id && (
-                <Badge variant="secondary" className="ml-2">
-                  {grades.filter((g) => g.subjectId === subject.id).length}
-                </Badge>
-              )}
-            </Button>
-          ))}
+          {subjects.map((subject) => {
+            const teacherName = getTeachersForSubject(subject.id);
+            return (
+              <Button
+                key={subject.id}
+                variant={filterSubject === subject.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterSubject(filterSubject === subject.id ? "" : subject.id)}
+                data-testid={`filter-subject-${subject.id}`}
+              >
+                {subject.name}
+                {teacherName && (
+                  <span className="ml-1 opacity-70 text-xs">({teacherName})</span>
+                )}
+                {filterSubject === subject.id && (
+                  <Badge variant="secondary" className="ml-2">
+                    {grades.filter((g) => g.subjectId === subject.id).length}
+                  </Badge>
+                )}
+              </Button>
+            );
+          })}
         </div>
       )}
 
       {filterSubject && filterSubject !== "all" && (
-        <WeightedAverageCard
-          subjectId={filterSubject}
-          subjectName={getSubjectName(filterSubject)}
-          weights={getSubjectWeights(filterSubject)}
-          grades={grades}
-          students={students}
-          computeWeightedAverage={computeWeightedAverage}
-          totalWeight={totalWeightForSubject(filterSubject)}
-          onManageWeights={() => openWeightsDialog(filterSubject)}
-          getGradeColor={getGradeColor}
-        />
+        <>
+          {getTeachersForSubject(filterSubject) && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-subject-teacher">
+              <Users className="h-4 w-4" />
+              <span>Teacher: <span className="font-medium text-foreground">{getTeachersForSubject(filterSubject)}</span></span>
+            </div>
+          )}
+          <WeightedAverageCard
+            subjectId={filterSubject}
+            subjectName={getSubjectName(filterSubject)}
+            weights={getSubjectWeights(filterSubject)}
+            grades={grades}
+            students={students}
+            computeWeightedAverage={computeWeightedAverage}
+            totalWeight={totalWeightForSubject(filterSubject)}
+            onManageWeights={() => openWeightsDialog(filterSubject)}
+            getGradeColor={getGradeColor}
+          />
+        </>
       )}
 
       <Card>
@@ -535,6 +715,7 @@ export default function Grades() {
                   {filterSubject && subjects.find(s => s.id === filterSubject)
                     ? ` in ${subjects.find(s => s.id === filterSubject)!.name}`
                     : ""}
+                  {" \u00B7 Double-click score or assignment name to edit inline"}
                 </CardDescription>
               </div>
             </div>
@@ -542,7 +723,7 @@ export default function Grades() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by student..."
+                  placeholder="Search by student or assignment..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -593,6 +774,7 @@ export default function Grades() {
                   <TableRow>
                     <TableHead>Student</TableHead>
                     {(!filterSubject || filterSubject === "all") && <TableHead>Subject</TableHead>}
+                    <TableHead>Assignment</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Score</TableHead>
                     <TableHead>Percentage</TableHead>
@@ -604,12 +786,38 @@ export default function Grades() {
                 <TableBody>
                   {filteredGrades.map((grade) => {
                     const pct = Math.round((grade.score / grade.maxScore) * 100);
+                    const isEditingScore = inlineEdit?.gradeId === grade.id && inlineEdit.field === "score";
+                    const isEditingName = inlineEdit?.gradeId === grade.id && inlineEdit.field === "assignmentName";
                     return (
                       <TableRow key={grade.id} data-testid={`row-grade-${grade.id}`}>
                         <TableCell className="font-medium">{getStudentName(grade.studentId)}</TableCell>
                         {(!filterSubject || filterSubject === "all") && (
                           <TableCell>{getSubjectName(grade.subjectId)}</TableCell>
                         )}
+                        <TableCell
+                          className="cursor-pointer"
+                          onDoubleClick={() => handleDoubleClick(grade.id, "assignmentName", grade.assignmentName || "")}
+                          data-testid={`cell-assignment-${grade.id}`}
+                        >
+                          {isEditingName ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                ref={inlineInputRef}
+                                value={inlineValue}
+                                onChange={(e) => setInlineValue(e.target.value)}
+                                onKeyDown={handleInlineKeyDown}
+                                onBlur={commitInlineEdit}
+                                className="h-7 text-sm w-32"
+                                placeholder="Name..."
+                                data-testid={`input-inline-name-${grade.id}`}
+                              />
+                            </div>
+                          ) : (
+                            <span className={grade.assignmentName ? "" : "text-muted-foreground"}>
+                              {grade.assignmentName || "—"}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {grade.category ? (
                             <Badge variant="outline" data-testid={`badge-category-${grade.id}`}>{grade.category}</Badge>
@@ -617,7 +825,29 @@ export default function Grades() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell>{grade.score}/{grade.maxScore}</TableCell>
+                        <TableCell
+                          className="cursor-pointer"
+                          onDoubleClick={() => handleDoubleClick(grade.id, "score", grade.score)}
+                          data-testid={`cell-score-${grade.id}`}
+                        >
+                          {isEditingScore ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                ref={inlineInputRef}
+                                type="number"
+                                value={inlineValue}
+                                onChange={(e) => setInlineValue(e.target.value)}
+                                onKeyDown={handleInlineKeyDown}
+                                onBlur={commitInlineEdit}
+                                className="h-7 text-sm w-16"
+                                data-testid={`input-inline-score-${grade.id}`}
+                              />
+                              <span className="text-muted-foreground">/{grade.maxScore}</span>
+                            </div>
+                          ) : (
+                            <span>{grade.score}/{grade.maxScore}</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge className={getGradeColor(grade.score, grade.maxScore)} variant="secondary">
                             {pct}%

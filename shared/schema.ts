@@ -51,6 +51,7 @@ export const grades = pgTable("grades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   studentId: varchar("student_id").notNull(),
   subjectId: varchar("subject_id").notNull(),
+  assignmentName: text("assignment_name"),
   score: integer("score").notNull(),
   maxScore: integer("max_score").notNull().default(100),
   category: text("category"),

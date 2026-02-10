@@ -193,6 +193,7 @@ export async function registerRoutes(
       if (body.maxScore !== undefined) body.maxScore = Number(body.maxScore);
       if (body.category === "") body.category = null;
       if (body.term === "") body.term = null;
+      if (body.assignmentName === "") body.assignmentName = null;
       if (body.fileName === "") body.fileName = null;
       if (body.fileUrl === "") body.fileUrl = null;
 
@@ -221,6 +222,52 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/grades/bulk", upload.single("file"), async (req, res) => {
+    try {
+      const body = { ...req.body };
+      if (body.score !== undefined) body.score = Number(body.score);
+      if (body.maxScore !== undefined) body.maxScore = Number(body.maxScore);
+      if (body.category === "") body.category = null;
+      if (body.term === "") body.term = null;
+      if (body.assignmentName === "") body.assignmentName = null;
+      if (body.fileName === "") body.fileName = null;
+      if (body.fileUrl === "") body.fileUrl = null;
+
+      const subject = await storage.getSubject(body.subjectId);
+      if (!subject) {
+        return res.status(400).json({ error: "Subject not found" });
+      }
+
+      if (req.file) {
+        body.fileName = req.file.originalname;
+        body.fileUrl = `/uploads/${req.file.filename}`;
+      }
+
+      const allStudents = await storage.getStudents();
+      if (allStudents.length === 0) {
+        return res.status(400).json({ error: "No students found" });
+      }
+
+      const createdGrades = [];
+      for (const student of allStudents) {
+        const gradeData = {
+          ...body,
+          studentId: student.id,
+        };
+        const data = insertGradeSchema.parse(gradeData);
+        const grade = await storage.createGrade(data);
+        createdGrades.push(grade);
+      }
+
+      res.status(201).json(createdGrades);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create grades" });
+    }
+  });
+
   app.put("/api/grades/:id", upload.single("file"), async (req, res) => {
     try {
       const body = { ...req.body };
@@ -228,6 +275,7 @@ export async function registerRoutes(
       if (body.maxScore !== undefined) body.maxScore = Number(body.maxScore);
       if (body.category === "") body.category = null;
       if (body.term === "") body.term = null;
+      if (body.assignmentName === "") body.assignmentName = null;
       if (body.fileName === "") body.fileName = null;
       if (body.fileUrl === "") body.fileUrl = null;
 
