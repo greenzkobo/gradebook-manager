@@ -1,0 +1,56 @@
+Create a seed script and verify the full application works end to end.
+
+1. Create script/seed-admin.ts:
+   - Import bcryptjs and db/storage
+   - Check if any user with role "admin" exists using storage.getUsersByRole("admin")
+   - If none exists:
+     - Hash password "Admin@1234!" with bcrypt (12 rounds)
+     - Create user: username "admin", role "admin"
+     - Log: "Admin created — username: admin / password: Admin@1234!"
+   - If already exists: log "Admin already exists, skipping."
+   - Exit cleanly
+
+2. Add to package.json scripts:
+   "seed": "tsx script/seed-admin.ts"
+
+3. Update replit.md with:
+
+   ## Default Credentials
+   Run `npm run seed` to create the default admin account:
+   - Username: admin
+   - Password: Admin@1234!
+   Change this password immediately after first login.
+
+   ## Role Permission Matrix
+
+   | Action                        | Admin | Teacher | Student |
+   |-------------------------------|-------|---------|---------|
+   | View own grades               |  ✅   |   ✅    |   ✅    |
+   | View all grades               |  ✅   |   ✅*   |   ❌    |
+   | Add/edit grades               |  ✅   |   ✅*   |   ❌    |
+   | Delete grades                 |  ✅   |   ❌    |   ❌    |
+   | Manage students               |  ✅   |   ❌    |   ❌    |
+   | Manage teachers               |  ✅   |   ❌    |   ❌    |
+   | Manage subjects               |  ✅   |   ❌    |   ❌    |
+   | Manage sections/terms/years   |  ✅   |   ❌    |   ❌    |
+   | Manage enrollments            |  ✅   |   ❌    |   ❌    |
+   | Assign category weights       |  ✅   |   ✅*   |   ❌    |
+
+   * Teachers scoped to their own assigned sections only
+
+   ## Security Features
+   - All inputs sanitized with xss + validator before processing
+   - Rate limiting: 10 auth attempts / 15min, 60 writes / min, 200 reads / min per IP
+   - Sessions stored in PostgreSQL (8-hour expiry)
+   - Passwords hashed with bcrypt (12 rounds)
+   - Session ID regenerated on login to prevent session fixation
+
+4. Run npm run check — fix all TypeScript errors.
+5. Run npm run seed to create the admin user.
+6. Start the server with npm run dev and verify:
+   - POST /api/auth/login with admin/Admin@1234! returns a session cookie
+   - GET /api/students with the session returns data
+   - GET /api/students without a session returns 401
+   - POST /api/grades with a student session returns 403
+   - Sending a script tag in a grade name field (e.g. "<script>alert(1)</script>") gets stripped
+   - 11+ rapid POST /api/auth/login requests from the same IP returns 429 on the 11th

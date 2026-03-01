@@ -994,7 +994,7 @@ function WeightedAverageCard({
   getGradeColor: (score: number, maxScore: number) => string;
 }) {
   const subjectGrades = grades.filter((g) => g.subjectId === subjectId);
-  const uniqueStudents = [...new Set(subjectGrades.map((g) => g.studentId))];
+  const uniqueStudents = Array.from(new Set(subjectGrades.map((g) => g.studentId)));
 
   if (subjectGrades.length === 0 && weights.length === 0) return null;
 

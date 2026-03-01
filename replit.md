@@ -3,7 +3,38 @@
 ## Overview
 A web-based school grades management system that allows teachers and administrators to track student performance, manage subjects, and record grades efficiently. Features role-based authentication and authorization.
 
+## Default Credentials
+Run `npx tsx script/seed-admin.ts` to create the default admin account:
+- Username: admin
+- Password: Admin@1234!
+Change this password immediately after first login.
+
+## Role Permission Matrix
+
+| Action                        | Admin | Teacher | Student |
+|-------------------------------|-------|---------|---------|
+| View own grades               |  ✅   |   ✅    |   ✅    |
+| View all grades               |  ✅   |   ✅*   |   ❌    |
+| Add/edit grades               |  ✅   |   ✅*   |   ❌    |
+| Delete grades                 |  ✅   |   ❌    |   ❌    |
+| Manage students               |  ✅   |   ❌    |   ❌    |
+| Manage teachers               |  ✅   |   ❌    |   ❌    |
+| Manage subjects               |  ✅   |   ❌    |   ❌    |
+| Manage sections/terms/years   |  ✅   |   ❌    |   ❌    |
+| Manage enrollments            |  ✅   |   ❌    |   ❌    |
+| Assign category weights       |  ✅   |   ✅*   |   ❌    |
+
+\* Teachers scoped to their own assigned sections only
+
+## Security Features
+- All inputs sanitized with xss + validator before processing
+- Rate limiting: 10 auth attempts / 15min, 60 writes / min, 200 reads / min per IP
+- Sessions stored in PostgreSQL (8-hour expiry)
+- Passwords hashed with bcrypt (12 rounds)
+- Session ID regenerated on login to prevent session fixation
+
 ## Recent Changes
+- March 2026: Added seed script (script/seed-admin.ts) for default admin account
 - March 2026: Added UI permission enforcement - action buttons (add/edit/delete) hidden based on user role via usePermissions hook across all pages
 - March 2026: Added role-specific info banners on Gradebook (student/teacher view notices)
 - March 2026: Sidebar navigation filtered by role (Students/Teachers hidden for students)
@@ -95,6 +126,8 @@ A web-based school grades management system that allows teachers and administrat
 
 ## Development Commands
 - `npm run dev` - Start development server (frontend + backend)
+- `npx tsx script/seed-admin.ts` - Create/reset the default admin account
+- `npm run check` - Run TypeScript type checking
 - Frontend runs on port 5000 via Vite proxy
 
 ## User Preferences
