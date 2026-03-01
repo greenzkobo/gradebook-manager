@@ -1,0 +1,41 @@
+Update existing frontend page components to hide or disable controls based on user role.
+Use the usePermissions hook created in the previous step.
+Do NOT restructure layouts — only wrap action elements in conditional rendering.
+
+Apply these rules to the existing pages:
+
+GRADES PAGE (wherever grades are listed and managed):
+- Wrap the "Add Grade" button in: {canEditGrades() && <button...>}
+- Wrap each "Edit Grade" button/icon in: {canEditGrades() && ...}
+- Wrap each "Delete Grade" button/icon in: {canDeleteGrades() && ...}
+- If isStudent(): add a read-only banner: "Showing your grades only"
+- If isTeacher(): add an info banner: "Showing grades for your classes only"
+
+STUDENTS PAGE:
+- Wrap "Add Student", "Edit Student", "Delete Student" in: {canManageStudents() && ...}
+- If isStudent(): redirect away from this page entirely (students should not see student management)
+
+TEACHERS PAGE:
+- Wrap "Add Teacher", "Edit Teacher", "Delete Teacher" in: {canManageTeachers() && ...}
+- If isStudent(): do not show the Teachers page link in the nav at all
+
+SUBJECTS PAGE:
+- Wrap all add/edit/delete subject controls in: {canManageSubjects() && ...}
+
+SECTIONS, TERMS, ACADEMIC YEARS, ENROLLMENTS PAGES:
+- Wrap all create/edit/delete controls in: {canManageAcademicStructure() && ...}
+- If isStudent(): hide navigation links to these pages entirely
+
+NAVIGATION / SIDEBAR:
+- Use the permissions hook to conditionally render nav links:
+  - "Teachers" link: hide if isStudent()
+  - "Students" management link: hide if isStudent()
+  - "Academic Structure" / "Sections" / "Terms" links: hide if isStudent() or isTeacher()
+  - "Enrollments" link: hide if isStudent()
+- Show a user info section at top/bottom of sidebar:
+  - User's display name
+  - Role badge: "Admin" (red), "Teacher" (blue), "Student" (green)
+  - Logout button
+
+For the student view, if the student navigates to a restricted page directly via URL,
+ProtectedRoute will show the 403 card — no additional redirect needed on individual pages.

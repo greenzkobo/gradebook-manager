@@ -4,6 +4,9 @@
 A web-based school grades management system that allows teachers and administrators to track student performance, manage subjects, and record grades efficiently. Features role-based authentication and authorization.
 
 ## Recent Changes
+- March 2026: Added UI permission enforcement - action buttons (add/edit/delete) hidden based on user role via usePermissions hook across all pages
+- March 2026: Added role-specific info banners on Gradebook (student/teacher view notices)
+- March 2026: Sidebar navigation filtered by role (Students/Teachers hidden for students)
 - March 2026: Added authentication system (login, register, logout, session management)
 - March 2026: Added role-based access control (admin, teacher, student) with protected routes
 - March 2026: Split routes into modular files with input sanitization and rate limiting

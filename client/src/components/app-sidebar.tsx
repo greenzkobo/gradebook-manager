@@ -2,6 +2,7 @@ import { useLocation, Link } from "wouter";
 import { LayoutDashboard, Users, BookOpen, ClipboardList, GraduationCap, UserCheck, LogOut } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { logoutUser } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
@@ -19,14 +20,6 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 
-const menuItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Students", url: "/students", icon: Users },
-  { title: "Subjects", url: "/subjects", icon: BookOpen },
-  { title: "Gradebook", url: "/grades", icon: ClipboardList },
-  { title: "Teachers", url: "/teachers", icon: UserCheck },
-];
-
 const roleBadgeVariant: Record<string, "default" | "secondary" | "outline"> = {
   admin: "default",
   teacher: "secondary",
@@ -36,6 +29,7 @@ const roleBadgeVariant: Record<string, "default" | "secondary" | "outline"> = {
 export function AppSidebar() {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
+  const { isStudent } = usePermissions();
 
   const logoutMutation = useMutation({
     mutationFn: logoutUser,
@@ -44,6 +38,14 @@ export function AppSidebar() {
       navigate("/login");
     },
   });
+
+  const menuItems = [
+    { title: "Dashboard", url: "/", icon: LayoutDashboard, visible: true },
+    { title: "Students", url: "/students", icon: Users, visible: !isStudent() },
+    { title: "Subjects", url: "/subjects", icon: BookOpen, visible: true },
+    { title: "Gradebook", url: "/grades", icon: ClipboardList, visible: true },
+    { title: "Teachers", url: "/teachers", icon: UserCheck, visible: !isStudent() },
+  ];
 
   return (
     <Sidebar>
@@ -63,7 +65,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {menuItems.filter((item) => item.visible).map((item) => {
                 const isActive = location === item.url || 
                   (item.url !== "/" && location.startsWith(item.url));
                 return (

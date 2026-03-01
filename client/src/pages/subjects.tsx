@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, BookOpen, Search } from "lucide-react";
 import { insertSubjectSchema, type Subject, type InsertSubject, type Grade } from "@shared/schema";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const subjectFormSchema = insertSubjectSchema.extend({
   name: insertSubjectSchema.shape.name.min(2, "Name must be at least 2 characters"),
@@ -27,6 +28,7 @@ export default function Subjects() {
   const [deleteConfirm, setDeleteConfirm] = useState<Subject | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { canManageSubjects } = usePermissions();
 
   const { data: subjects = [], isLoading } = useQuery<Subject[]>({
     queryKey: ["/api/subjects"],
@@ -129,70 +131,72 @@ export default function Subjects() {
           <h1 className="text-2xl font-bold" data-testid="text-subjects-title">Subjects</h1>
           <p className="text-muted-foreground">Manage course subjects</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-subject">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Subject
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingSubject ? "Edit Subject" : "Add New Subject"}</DialogTitle>
-              <DialogDescription>
-                {editingSubject ? "Update subject information" : "Enter the subject details below"}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Subject Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Mathematics" {...field} data-testid="input-subject-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description (optional)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Brief description of the subject..."
-                          className="resize-none"
-                          {...field}
-                          value={field.value ?? ""}
-                          data-testid="input-subject-description"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={handleDialogClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    data-testid="button-submit-subject"
-                  >
-                    {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingSubject ? "Update" : "Add Subject"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        {canManageSubjects() && (
+          <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-subject">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Subject
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingSubject ? "Edit Subject" : "Add New Subject"}</DialogTitle>
+                <DialogDescription>
+                  {editingSubject ? "Update subject information" : "Enter the subject details below"}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subject Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Mathematics" {...field} data-testid="input-subject-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description (optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Brief description of the subject..."
+                            className="resize-none"
+                            {...field}
+                            value={field.value ?? ""}
+                            data-testid="input-subject-description"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={handleDialogClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                      data-testid="button-submit-subject"
+                    >
+                      {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingSubject ? "Update" : "Add Subject"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="relative w-full sm:w-64">
@@ -236,24 +240,26 @@ export default function Subjects() {
                       </div>
                       <CardTitle className="text-lg">{subject.name}</CardTitle>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleEdit(subject)}
-                        data-testid={`button-edit-subject-${subject.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setDeleteConfirm(subject)}
-                        data-testid={`button-delete-subject-${subject.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                    {canManageSubjects() && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleEdit(subject)}
+                          data-testid={`button-edit-subject-${subject.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleteConfirm(subject)}
+                          data-testid={`button-delete-subject-${subject.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>

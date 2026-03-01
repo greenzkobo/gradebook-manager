@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, ClipboardList, Search, BookOpen, Upload, FileText, Download, Settings2, X, Users, Check } from "lucide-react";
 import { GRADE_CATEGORIES, type Grade, type Student, type Subject, type CategoryWeight, type Teacher, type TeacherSubject } from "@shared/schema";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const gradeFormSchema = z.object({
   studentId: z.string().optional(),
@@ -48,6 +49,7 @@ export default function Grades() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inlineInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { canEditGrades, canDeleteGrades, isStudent, isTeacher } = usePermissions();
 
   const { data: grades = [], isLoading } = useQuery<Grade[]>({
     queryKey: ["/api/grades"],
@@ -383,7 +385,7 @@ export default function Grades() {
           <p className="text-muted-foreground">Record and manage student grades by subject</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {filterSubject && filterSubject !== "all" && (
+          {canEditGrades() && filterSubject && filterSubject !== "all" && (
             <Button
               variant="outline"
               onClick={() => openWeightsDialog(filterSubject)}
@@ -393,13 +395,14 @@ export default function Grades() {
               Manage Weights
             </Button>
           )}
-          <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
-            <DialogTrigger asChild>
-              <Button disabled={!canAddGrades} data-testid="button-add-grade">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Grade
-              </Button>
-            </DialogTrigger>
+          {canEditGrades() && (
+            <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
+              <DialogTrigger asChild>
+                <Button disabled={!canAddGrades} data-testid="button-add-grade">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Grade
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editingGrade ? "Edit Grade" : "Record New Grade"}</DialogTitle>
@@ -628,15 +631,36 @@ export default function Grades() {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          )}
         </div>
       </div>
 
-      {!canAddGrades && (
+      {canEditGrades() && !canAddGrades && (
         <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
           <CardContent className="py-4">
             <p className="text-sm text-amber-800 dark:text-amber-200" data-testid="text-grades-prereq">
               You need to add at least one student and one subject before you can record grades.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isStudent() && (
+        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
+          <CardContent className="py-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200" data-testid="text-student-view-notice">
+              You are viewing your grades only.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isTeacher() && (
+        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
+          <CardContent className="py-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200" data-testid="text-teacher-view-notice">
+              Showing grades for your assigned subjects only.
             </p>
           </CardContent>
         </Card>
@@ -780,7 +804,9 @@ export default function Grades() {
                     <TableHead>Percentage</TableHead>
                     <TableHead>Term</TableHead>
                     <TableHead>File</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
+                    {(canEditGrades() || canDeleteGrades()) && (
+                      <TableHead className="w-24">Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -795,8 +821,8 @@ export default function Grades() {
                           <TableCell>{getSubjectName(grade.subjectId)}</TableCell>
                         )}
                         <TableCell
-                          className="cursor-pointer"
-                          onDoubleClick={() => handleDoubleClick(grade.id, "assignmentName", grade.assignmentName || "")}
+                          className={canEditGrades() ? "cursor-pointer" : ""}
+                          onDoubleClick={canEditGrades() ? () => handleDoubleClick(grade.id, "assignmentName", grade.assignmentName || "") : undefined}
                           data-testid={`cell-assignment-${grade.id}`}
                         >
                           {isEditingName ? (
@@ -826,8 +852,8 @@ export default function Grades() {
                           )}
                         </TableCell>
                         <TableCell
-                          className="cursor-pointer"
-                          onDoubleClick={() => handleDoubleClick(grade.id, "score", grade.score)}
+                          className={canEditGrades() ? "cursor-pointer" : ""}
+                          onDoubleClick={canEditGrades() ? () => handleDoubleClick(grade.id, "score", grade.score) : undefined}
                           data-testid={`cell-score-${grade.id}`}
                         >
                           {isEditingScore ? (
@@ -872,26 +898,32 @@ export default function Grades() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleEdit(grade)}
-                              data-testid={`button-edit-grade-${grade.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteConfirm(grade)}
-                              data-testid={`button-delete-grade-${grade.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                        {(canEditGrades() || canDeleteGrades()) && (
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {canEditGrades() && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleEdit(grade)}
+                                  data-testid={`button-edit-grade-${grade.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canDeleteGrades() && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setDeleteConfirm(grade)}
+                                  data-testid={`button-delete-grade-${grade.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}

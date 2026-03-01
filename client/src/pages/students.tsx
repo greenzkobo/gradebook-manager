@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Users, Search } from "lucide-react";
 import { insertStudentSchema, type Student, type InsertStudent } from "@shared/schema";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const studentFormSchema = insertStudentSchema.extend({
   fullName: insertStudentSchema.shape.fullName.min(2, "Name must be at least 2 characters"),
@@ -36,6 +37,7 @@ export default function Students() {
   const [deleteConfirm, setDeleteConfirm] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { canManageStudents } = usePermissions();
 
   const { data: students = [], isLoading } = useQuery<Student[]>({
     queryKey: ["/api/students"],
@@ -128,88 +130,90 @@ export default function Students() {
           <h1 className="text-2xl font-bold" data-testid="text-students-title">Students</h1>
           <p className="text-muted-foreground">Manage student records</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-student">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Student
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingStudent ? "Edit Student" : "Add New Student"}</DialogTitle>
-              <DialogDescription>
-                {editingStudent ? "Update student information" : "Enter the student details below"}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} data-testid="input-student-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="gradeLevel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Grade Level</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+        {canManageStudents() && (
+          <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-student">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Student
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingStudent ? "Edit Student" : "Add New Student"}</DialogTitle>
+                <DialogDescription>
+                  {editingStudent ? "Update student information" : "Enter the student details below"}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-grade-level">
-                            <SelectValue placeholder="Select grade level" />
-                          </SelectTrigger>
+                          <Input placeholder="John Doe" {...field} data-testid="input-student-name" />
                         </FormControl>
-                        <SelectContent>
-                          {gradeLevels.map((level) => (
-                            <SelectItem key={level} value={level} data-testid={`option-grade-${level.replace(/\s+/g, '-').toLowerCase()}`}>
-                              {level}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email (optional)</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="student@school.edu" {...field} value={field.value ?? ""} data-testid="input-student-email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={handleDialogClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    data-testid="button-submit-student"
-                  >
-                    {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingStudent ? "Update" : "Add Student"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="gradeLevel"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Grade Level</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-grade-level">
+                              <SelectValue placeholder="Select grade level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {gradeLevels.map((level) => (
+                              <SelectItem key={level} value={level} data-testid={`option-grade-${level.replace(/\s+/g, '-').toLowerCase()}`}>
+                                {level}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email (optional)</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="student@school.edu" {...field} value={field.value ?? ""} data-testid="input-student-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={handleDialogClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                      data-testid="button-submit-student"
+                    >
+                      {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingStudent ? "Update" : "Add Student"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Card>
@@ -252,7 +256,9 @@ export default function Students() {
                     <TableHead>Name</TableHead>
                     <TableHead>Grade Level</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
+                    {canManageStudents() && (
+                      <TableHead className="w-24">Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -261,26 +267,28 @@ export default function Students() {
                       <TableCell className="font-medium">{student.fullName}</TableCell>
                       <TableCell>{student.gradeLevel}</TableCell>
                       <TableCell className="text-muted-foreground">{student.email || "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleEdit(student)}
-                            data-testid={`button-edit-student-${student.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setDeleteConfirm(student)}
-                            data-testid={`button-delete-student-${student.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {canManageStudents() && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleEdit(student)}
+                              data-testid={`button-edit-student-${student.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteConfirm(student)}
+                              data-testid={`button-delete-student-${student.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

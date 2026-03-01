@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, UserCheck, Search, X, BookOpen } from "lucide-react";
 import { insertTeacherSchema, type Teacher, type InsertTeacher, type Subject, type TeacherSubject } from "@shared/schema";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const teacherFormSchema = insertTeacherSchema.extend({
   fullName: insertTeacherSchema.shape.fullName.min(2, "Name must be at least 2 characters"),
@@ -29,6 +30,7 @@ export default function Teachers() {
   const [assignOpen, setAssignOpen] = useState<Teacher | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { canManageTeachers } = usePermissions();
 
   const { data: teachers = [], isLoading } = useQuery<Teacher[]>({
     queryKey: ["/api/teachers"],
@@ -164,64 +166,66 @@ export default function Teachers() {
           <h1 className="text-2xl font-bold" data-testid="text-teachers-title">Teachers</h1>
           <p className="text-muted-foreground">Manage teachers and their subject assignments</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-teacher">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Teacher
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingTeacher ? "Edit Teacher" : "Add New Teacher"}</DialogTitle>
-              <DialogDescription>
-                {editingTeacher ? "Update teacher information" : "Enter the teacher details below"}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Jane Doe" {...field} data-testid="input-teacher-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email (optional)</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="teacher@school.edu" {...field} value={field.value ?? ""} data-testid="input-teacher-email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={handleDialogClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    data-testid="button-submit-teacher"
-                  >
-                    {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingTeacher ? "Update" : "Add Teacher"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        {canManageTeachers() && (
+          <Dialog open={open} onOpenChange={(v) => v ? setOpen(v) : handleDialogClose()}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-teacher">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Teacher
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingTeacher ? "Edit Teacher" : "Add New Teacher"}</DialogTitle>
+                <DialogDescription>
+                  {editingTeacher ? "Update teacher information" : "Enter the teacher details below"}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Jane Doe" {...field} data-testid="input-teacher-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email (optional)</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="teacher@school.edu" {...field} value={field.value ?? ""} data-testid="input-teacher-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={handleDialogClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || updateMutation.isPending}
+                      data-testid="button-submit-teacher"
+                    >
+                      {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingTeacher ? "Update" : "Add Teacher"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="relative w-full sm:w-64">
@@ -270,7 +274,7 @@ export default function Teachers() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    {canManageTeachers() && <div className="flex items-center gap-1">
                       <Button
                         size="icon"
                         variant="ghost"
@@ -287,7 +291,7 @@ export default function Teachers() {
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
-                    </div>
+                    </div>}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -296,15 +300,17 @@ export default function Teachers() {
                       <span className="text-sm text-muted-foreground">
                         {assignments.length} {assignments.length === 1 ? "subject" : "subjects"} assigned
                       </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setAssignOpen(teacher)}
-                        data-testid={`button-manage-subjects-${teacher.id}`}
-                      >
-                        <BookOpen className="h-3 w-3 mr-1" />
-                        Manage
-                      </Button>
+                      {canManageTeachers() && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAssignOpen(teacher)}
+                          data-testid={`button-manage-subjects-${teacher.id}`}
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Manage
+                        </Button>
+                      )}
                     </div>
                     {assignments.length > 0 && (
                       <div className="flex flex-wrap gap-1">
