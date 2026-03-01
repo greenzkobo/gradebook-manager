@@ -1,0 +1,101 @@
+Split server/routes.ts into separate route files, one per resource. Each file exports an
+Express Router. Apply auth middleware, rate limiters, and input sanitization to every route.
+Keep all existing business logic — only reorganize and harden it.
+
+Create these files:
+
+─── server/routes/students.ts ───
+- Import: requireAuth, requireRole from middleware/auth.ts
+- Import: writeLimiter, readLimiter from middleware/rateLimiter.ts
+- Import: sanitizeString, sanitizeOptionalString, sanitizeEmail, sanitizeUUID from utils/sanitize.ts
+- GET /  → requireAuth, readLimiter → return all students
+  - If req.user.role === "student": return only the single student matching req.user.studentId
+- GET /:id → requireAuth, readLimiter → sanitize id with sanitizeUUID
+- POST /  → requireAuth, requireRole("admin"), writeLimiter
+  - Sanitize: fullName (sanitizeString), gradeLevel (sanitizeString), email (sanitizeEmail, optional)
+- PUT /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID on id, same field sanitization
+- DELETE /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID on id
+
+─── server/routes/teachers.ts ───
+- GET /  → requireAuth, readLimiter
+  - If req.user.role === "student": return 403
+- GET /:id → requireAuth, readLimiter → sanitizeUUID
+- POST /  → requireAuth, requireRole("admin"), writeLimiter
+  - Sanitize: fullName (sanitizeString), email (sanitizeEmail, optional)
+- PUT /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID + same field sanitization
+- DELETE /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID
+
+─── server/routes/subjects.ts ───
+- GET /  → requireAuth, readLimiter
+- GET /:id → requireAuth, readLimiter → sanitizeUUID
+- POST /  → requireAuth, requireRole("admin"), writeLimiter
+  - Sanitize: name (sanitizeString), description (sanitizeOptionalString)
+- PUT /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID + field sanitization
+- DELETE /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID
+
+─── server/routes/grades.ts ───
+- Import uploadLimiter in addition to readLimiter and writeLimiter
+- GET /  → requireAuth, readLimiter
+  - If req.user.role === "student": force filter to req.user.studentId regardless of query params
+  - If req.user.role === "teacher": filter to only grades for subjects in sections where teacherId = req.user.teacherId
+  - If req.user.role === "admin": return all (or filter by ?studentId= / ?subjectId= / ?sectionId= query params after sanitizing with sanitizeUUID)
+- GET /:id → requireAuth, readLimiter → sanitizeUUID
+  - If student: verify grade.studentId === req.user.studentId else 403
+- POST /  → requireAuth, requireRole("admin","teacher"), uploadLimiter, writeLimiter
+  - Sanitize all fields before passing to insertGradeSchema:
+    studentId, subjectId (sanitizeUUID)
+    score, maxScore via sanitizeScore()
+    assignmentName (sanitizeString)
+    category via sanitizeGradeCategory()
+    term (sanitizeOptionalString)
+    date via sanitizeISODate() — optional
+  - If teacher: verify subjectId belongs to a section where teacherId = req.user.teacherId else 403
+- POST /bulk → requireAuth, requireRole("admin","teacher"), uploadLimiter
+  - Same sanitization as POST /
+  - If teacher: same ownership check as above
+- PUT /:id → requireAuth, requireRole("admin","teacher"), uploadLimiter, writeLimiter
+  - sanitizeUUID on id
+  - Same field sanitization as POST /
+  - If teacher: verify ownership of the grade's subject/section
+- DELETE /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID
+
+─── server/routes/academicYears.ts ───
+- All GET → requireAuth, readLimiter
+- All POST/PUT/DELETE → requireAuth, requireRole("admin"), writeLimiter
+- Sanitize: name (sanitizeString), startDate/endDate (sanitizeISODate), isActive (Boolean cast)
+- sanitizeUUID on all :id params
+
+─── server/routes/terms.ts ───
+- All GET → requireAuth, readLimiter
+- All POST/DELETE → requireAuth, requireRole("admin"), writeLimiter
+- Sanitize: academicYearId (sanitizeUUID), name (sanitizeString), startDate/endDate (sanitizeISODate), isActive (Boolean cast)
+- sanitizeUUID on all :id params
+
+─── server/routes/sections.ts ───
+- All GET → requireAuth, readLimiter
+  - If student: filter to only sections where student is enrolled
+  - If teacher: filter to only sections where teacherId = req.user.teacherId
+- All POST/DELETE → requireAuth, requireRole("admin"), writeLimiter
+- Sanitize: subjectId, teacherId, termId (sanitizeUUID), sectionName (sanitizeString), roomNumber (sanitizeOptionalString)
+
+─── server/routes/enrollments.ts ───
+- GET /  → requireAuth, readLimiter
+  - If student: return only enrollments for req.user.studentId
+  - If teacher: return only enrollments for sections where teacherId = req.user.teacherId
+- POST /  → requireAuth, requireRole("admin"), writeLimiter
+  - Sanitize: studentId, sectionId (sanitizeUUID), enrollDate (sanitizeISODate), status (sanitizeStatus)
+- POST /bulk → requireAuth, requireRole("admin"), writeLimiter
+  - Sanitize: sectionId (sanitizeUUID), studentIds (array — sanitizeUUID each), enrollDate (sanitizeISODate), status (sanitizeStatus)
+- DELETE /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID
+
+─── server/routes/categoryWeights.ts ───
+- All GET → requireAuth, readLimiter
+- POST /  → requireAuth, requireRole("admin","teacher"), writeLimiter
+  - Sanitize: subjectId (sanitizeUUID), category (sanitizeGradeCategory), weight (sanitizeInteger, 1-100)
+- DELETE /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID
+
+─── server/routes/teacherSubjects.ts ───
+- All GET → requireAuth, readLimiter
+- POST / → requireAuth, requireRole("admin"), writeLimiter
+  - Sanitize: teacherId, subjectId (sanitizeUUID each)
+- DELETE /:id → requireAuth, requireRole("admin"), writeLimiter → sanitizeUUID
