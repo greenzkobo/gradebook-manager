@@ -1,0 +1,63 @@
+Create a new file server/utils/sanitize.ts that centralizes all input sanitization.
+This file will be imported by all API route handlers.
+
+Use the `xss` and `validator` packages that were installed.
+
+Implement and export the following functions:
+
+1. sanitizeString(value: unknown): string
+   - If value is not a string, return ""
+   - Trim whitespace
+   - Run xss() on the result to strip HTML/script tags
+   - Return the cleaned string
+
+2. sanitizeOptionalString(value: unknown): string | null
+   - If value is null, undefined, or empty string after trim, return null
+   - Otherwise run sanitizeString() and return the result
+
+3. sanitizeEmail(value: unknown): string
+   - Run sanitizeString() first
+   - Use validator.isEmail() to validate — if invalid throw new Error("Invalid email format")
+   - Return the normalized email (lowercase, trimmed)
+
+4. sanitizeInteger(value: unknown, min?: number, max?: number): number
+   - Parse to integer with parseInt
+   - If NaN, throw new Error("Must be a valid integer")
+   - If min provided and value < min, throw new Error(`Must be at least ${min}`)
+   - If max provided and value > max, throw new Error(`Must be at most ${max}`)
+   - Return the number
+
+5. sanitizeScore(score: unknown, maxScore: unknown): { score: number; maxScore: number }
+   - Sanitize both as integers
+   - maxScore must be between 1 and 1000
+   - score must be between 0 and maxScore
+   - Return { score, maxScore }
+
+6. sanitizeUUID(value: unknown): string
+   - Run sanitizeString()
+   - Use validator.isUUID() — if invalid throw new Error("Invalid ID format")
+   - Return the string
+
+7. sanitizeRole(value: unknown): "admin" | "teacher" | "student"
+   - Run sanitizeString()
+   - If not one of the three valid roles, throw new Error("Invalid role")
+   - Return the role
+
+8. sanitizeGradeCategory(value: unknown): string | null
+   - Run sanitizeOptionalString()
+   - If not null, verify it is one of the GRADE_CATEGORIES from shared/schema.ts
+   - If invalid, throw new Error("Invalid grade category")
+   - Return the value or null
+
+9. sanitizeStatus(value: unknown): string
+   - Run sanitizeString()
+   - Must be one of: "active", "dropped", "completed"
+   - If invalid, throw new Error("Invalid status value")
+   - Return the value
+
+10. sanitizeISODate(value: unknown): string
+    - Run sanitizeString()
+    - Use validator.isISO8601() to validate — if invalid throw new Error("Invalid date format. Use YYYY-MM-DD")
+    - Return the string
+
+Do not import this file anywhere yet — that happens in the next prompts.
