@@ -1,16 +1,45 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { pool } from "./db";
+import { authLimiter, readLimiter, writeLimiter } from "./middleware/rateLimiter";
+
+declare module "express-session" {
+  interface SessionData {
+    userId: string;
+  }
+}
 
 const app = express();
 const httpServer = createServer(app);
+
+const PgSession = connectPgSimple(session);
 
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
 }
+
+app.use(session({
+  store: new PgSession({
+    pool: pool,
+    tableName: "session",
+    createTableIfMissing: true,
+  }),
+  secret: process.env.SESSION_SECRET || "gradebook-dev-secret-change-in-production",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 8 * 60 * 60 * 1000,
+    sameSite: "lax",
+  },
+}));
 
 app.use(
   express.json({
@@ -21,6 +50,17 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+app.use("/api/auth", authLimiter);
+app.use("/api", (req, res, next) => {
+  if (req.method === "GET") {
+    return readLimiter(req, res, next);
+  }
+  if (["POST", "PUT", "DELETE"].includes(req.method)) {
+    return writeLimiter(req, res, next);
+  }
+  next();
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
