@@ -1,5 +1,11 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, BookOpen, ClipboardList, GraduationCap, UserCheck } from "lucide-react";
+import { LayoutDashboard, Users, BookOpen, ClipboardList, GraduationCap, UserCheck, LogOut } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { logoutUser } from "@/lib/auth";
+import { queryClient } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -21,8 +27,23 @@ const menuItems = [
   { title: "Teachers", url: "/teachers", icon: UserCheck },
 ];
 
+const roleBadgeVariant: Record<string, "default" | "secondary" | "outline"> = {
+  admin: "default",
+  teacher: "secondary",
+  student: "outline",
+};
+
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+  const { user } = useAuth();
+
+  const logoutMutation = useMutation({
+    mutationFn: logoutUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      navigate("/login");
+    },
+  });
 
   return (
     <Sidebar>
@@ -60,10 +81,26 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <p className="text-xs text-muted-foreground text-center">
-          School Grades Management System
-        </p>
+      <SidebarFooter className="p-4 border-t border-sidebar-border space-y-3">
+        {user && (
+          <div className="flex items-center justify-between" data-testid="text-user-info">
+            <span className="text-sm font-medium truncate">{user.username}</span>
+            <Badge variant={roleBadgeVariant[user.role] || "outline"} data-testid="badge-user-role">
+              {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+            </Badge>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={() => logoutMutation.mutate()}
+          disabled={logoutMutation.isPending}
+          data-testid="button-logout"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign Out
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );

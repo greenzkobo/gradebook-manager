@@ -6,49 +6,62 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Dashboard from "@/pages/dashboard";
 import Students from "@/pages/students";
 import Subjects from "@/pages/subjects";
 import Grades from "@/pages/grades";
 import Teachers from "@/pages/teachers";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
 import NotFound from "@/pages/not-found";
 
-function Router() {
-  return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/students" component={Students} />
-      <Route path="/subjects" component={Subjects} />
-      <Route path="/grades" component={Grades} />
-      <Route path="/teachers" component={Teachers} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
-function App() {
+function AuthenticatedLayout() {
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
   return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <header className="flex items-center justify-between gap-2 px-4 py-2 border-b bg-background">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <ThemeToggle />
+          </header>
+          <main className="flex-1 overflow-auto">
+            <Switch>
+              <Route path="/">{() => <ProtectedRoute><Dashboard /></ProtectedRoute>}</Route>
+              <Route path="/students">{() => <ProtectedRoute><Students /></ProtectedRoute>}</Route>
+              <Route path="/subjects">{() => <ProtectedRoute><Subjects /></ProtectedRoute>}</Route>
+              <Route path="/grades">{() => <ProtectedRoute><Grades /></ProtectedRoute>}</Route>
+              <Route path="/teachers">{() => <ProtectedRoute><Teachers /></ProtectedRoute>}</Route>
+              <Route component={NotFound} />
+            </Switch>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route>{() => <AuthenticatedLayout />}</Route>
+    </Switch>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <header className="flex items-center justify-between gap-2 px-4 py-2 border-b bg-background">
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <ThemeToggle />
-              </header>
-              <main className="flex-1 overflow-auto">
-                <Router />
-              </main>
-            </div>
-          </div>
-        </SidebarProvider>
+        <Router />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

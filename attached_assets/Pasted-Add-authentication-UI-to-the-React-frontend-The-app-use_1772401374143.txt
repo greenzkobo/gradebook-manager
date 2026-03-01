@@ -1,0 +1,58 @@
+Add authentication UI to the React frontend. The app uses wouter for routing,
+@tanstack/react-query for data fetching, and shadcn/ui components.
+
+1. Create client/src/lib/auth.ts — shared auth fetch helpers:
+   - loginUser(username: string, password: string): POST /api/auth/login
+   - registerUser(data: {...}): POST /api/auth/register
+   - logoutUser(): POST /api/auth/logout
+   - getMe(): GET /api/auth/me
+   All functions return the response JSON or throw on non-2xx.
+
+2. Create client/src/hooks/useAuth.ts:
+   - Use useQuery with queryKey ["auth", "me"] calling getMe()
+   - Return: { user, isLoading, isAuthenticated: !!user, role: user?.role }
+   - On 401 responses from getMe, treat as unauthenticated (don't throw)
+
+3. Create client/src/hooks/usePermissions.ts:
+   - Imports useAuth
+   - Returns these boolean helpers (based on user.role):
+     isAdmin()           → role === "admin"
+     isTeacher()         → role === "teacher"
+     isStudent()         → role === "student"
+     canEditGrades()     → role === "admin" || role === "teacher"
+     canDeleteGrades()   → role === "admin"
+     canManageStudents() → role === "admin"
+     canManageTeachers() → role === "admin"
+     canManageSubjects() → role === "admin"
+     canViewAllGrades()  → role === "admin" || role === "teacher"
+     canManageEnrollments() → role === "admin"
+     canManageAcademicStructure() → role === "admin"
+
+4. Create client/src/components/ProtectedRoute.tsx:
+   - Props: { children: ReactNode, roles?: string[] }
+   - Use useAuth to get user and isLoading
+   - While loading: show a centered spinner
+   - If not authenticated: redirect to /login using wouter's Redirect
+   - If roles prop provided and user.role not in roles: show a "403 — Access Denied" card
+   - Otherwise render children
+
+5. Create client/src/pages/LoginPage.tsx:
+   - Centered card layout, school/gradebook branding
+   - Form fields: username, password
+   - Submit calls loginUser(), on success: invalidate ["auth","me"] query and navigate to /
+   - On error: display error message from API response below the form
+   - Link at bottom: "Need an account? Register here" → /register
+
+6. Create client/src/pages/RegisterPage.tsx:
+   - Form fields: username, password, confirm password, role (Select dropdown)
+   - If role === "teacher": show a Select populated from GET /api/teachers listing teacher names
+   - If role === "student": show a Select populated from GET /api/students listing student names
+   - Client-side validate: passwords match, username min 3 chars, password min 8 chars
+   - Submit calls registerUser(), on success: navigate to /
+   - Link: "Already have an account? Log in" → /login
+
+7. Update the main App.tsx / router to:
+   - Make /login and /register public (no ProtectedRoute)
+   - Wrap ALL other routes in <ProtectedRoute>
+   - Add logout button to the existing sidebar/nav using useAuth().logoutUser
+   - Show user's name and a role badge (Admin / Teacher / Student) in the nav
