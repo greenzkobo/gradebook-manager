@@ -38,8 +38,18 @@ import {
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  createUserWithRole(data: {
+    username: string;
+    hashedPassword: string;
+    role: "admin" | "teacher" | "student";
+    teacherId?: string | null;
+    studentId?: string | null;
+  }): Promise<User>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<void>;
+  getUsersByRole(role: string): Promise<User[]>;
 
   getStudents(): Promise<Student[]>;
   getStudent(id: string): Promise<Student | undefined>;
@@ -115,14 +125,54 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserById(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await db.select().from(users).where(sql`lower(${users.username}) = ${username.toLowerCase()}`);
     return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async createUserWithRole(data: {
+    username: string;
+    hashedPassword: string;
+    role: "admin" | "teacher" | "student";
+    teacherId?: string | null;
+    studentId?: string | null;
+  }): Promise<User> {
+    const [user] = await db.insert(users).values({
+      username: data.username,
+      password: data.hashedPassword,
+      role: data.role,
+      teacherId: data.teacherId ?? null,
+      studentId: data.studentId ?? null,
+    }).returning();
+    return user;
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id));
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    const rows = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        role: users.role,
+        teacherId: users.teacherId,
+        studentId: users.studentId,
+      })
+      .from(users)
+      .where(eq(users.role, role));
+    return rows as User[];
   }
 
   async getStudents(): Promise<Student[]> {
