@@ -3,15 +3,28 @@ import { pgTable, text, varchar, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const USER_ROLES = ["admin", "teacher", "student"] as const;
+export type UserRole = "admin" | "teacher" | "student";
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role").notNull().default("student"),
+  teacherId: varchar("teacher_id"),
+  studentId: varchar("student_id"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  role: true,
+  teacherId: true,
+  studentId: true,
+}).partial({
+  role: true,
+  teacherId: true,
+  studentId: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
