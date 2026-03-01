@@ -1,0 +1,54 @@
+Create a new file server/routes/auth.ts that contains all authentication API routes
+as an Express Router. Each route must sanitize all inputs using server/utils/sanitize.ts
+and use bcryptjs for password operations.
+
+Import:
+- express Router
+- bcryptjs
+- sanitize functions from server/utils/sanitize.ts
+- storage from server/storage.ts
+- authLimiter from server/middleware/rateLimiter.ts
+
+Implement these routes on the router:
+
+POST /register
+- Apply authLimiter middleware to this route specifically
+- Extract and sanitize: username (sanitizeString, min 3 chars, max 50), 
+  password (raw string, min 8 chars — validate length only, do NOT sanitize/strip special chars),
+  role (sanitizeRole), teacherId (sanitizeOptionalString), studentId (sanitizeOptionalString)
+- Validate username is alphanumeric + underscores only (regex: /^[a-zA-Z0-9_]+$/)
+- If role is "teacher" and teacherId is null: return 400 { error: "teacherId required for teacher accounts" }
+- If role is "student" and studentId is null: return 400 { error: "studentId required for student accounts" }
+- If role is "teacher": verify teacher exists via storage.getTeacher(teacherId)
+- If role is "student": verify student exists via storage.getStudent(studentId)
+- Check no existing user has the same username (case-insensitive)
+- Hash password: bcrypt.hash(password, 12)
+- Create user via storage.createUserWithRole(...)
+- Set req.session.userId = user.id
+- Return 201 with user object (omit password field — delete user.password before responding)
+
+POST /login
+- Apply authLimiter middleware to this route specifically  
+- Extract and sanitize: username (sanitizeString), password (raw string, validate non-empty)
+- Look up user by username (case-insensitive)
+- If not found: return 401 { error: "Invalid username or password" }
+  (never reveal whether username or password was wrong)
+- Compare password with bcrypt.compare()
+- If mismatch: return 401 { error: "Invalid username or password" }
+- Set req.session.userId = user.id
+- Regenerate session ID after login (req.session.regenerate) to prevent session fixation
+- Return 200 with user object (omit password field)
+
+POST /logout
+- If no session, return 200 { success: true } immediately (idempotent)
+- Destroy session with req.session.destroy()
+- Clear the session cookie
+- Return 200 { success: true }
+
+GET /me
+- Check req.session.userId
+- If no session: return 401 { error: "Not authenticated" }
+- Look up user, return user object (omit password field)
+- If user not found: return 401 { error: "Session expired" }
+
+Export the router as default.
