@@ -16,6 +16,10 @@ import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import NotFound from "@/pages/not-found";
 
+function ProtectedPage({ component: Component }: { component: () => JSX.Element }) {
+  return <ProtectedRoute><Component /></ProtectedRoute>;
+}
+
 function AuthenticatedLayout() {
   const style = {
     "--sidebar-width": "16rem",
@@ -33,11 +37,11 @@ function AuthenticatedLayout() {
           </header>
           <main className="flex-1 overflow-auto">
             <Switch>
-              <Route path="/">{() => <ProtectedRoute><Dashboard /></ProtectedRoute>}</Route>
-              <Route path="/students">{() => <ProtectedRoute><Students /></ProtectedRoute>}</Route>
-              <Route path="/subjects">{() => <ProtectedRoute><Subjects /></ProtectedRoute>}</Route>
-              <Route path="/grades">{() => <ProtectedRoute><Grades /></ProtectedRoute>}</Route>
-              <Route path="/teachers">{() => <ProtectedRoute><Teachers /></ProtectedRoute>}</Route>
+              <Route path="/" component={() => <ProtectedPage component={Dashboard} />} />
+              <Route path="/students" component={() => <ProtectedPage component={Students} />} />
+              <Route path="/subjects" component={() => <ProtectedPage component={Subjects} />} />
+              <Route path="/grades" component={() => <ProtectedPage component={Grades} />} />
+              <Route path="/teachers" component={() => <ProtectedPage component={Teachers} />} />
               <Route component={NotFound} />
             </Switch>
           </main>
@@ -52,7 +56,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
-      <Route>{() => <AuthenticatedLayout />}</Route>
+      <Route component={AuthenticatedLayout} />
     </Switch>
   );
 }
